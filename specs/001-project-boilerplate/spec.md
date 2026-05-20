@@ -60,20 +60,22 @@ A developer adds a new tool to the agent — following the established pattern �
 
 ### Edge Cases
 
-- What happens when the agent receives a request that no registered tool can help with?
-- How does the service behave when the underlying LLM API is unreachable?
-- What happens when `config/personality.md` exists but is empty?
-- How does the service handle a request body that cannot be parsed?
+- What happens when the agent receives a request that no registered tool can help with? → Behavior is governed entirely by the system prompt; no hardcoded fallback applies.
+- How does the service behave when the underlying LLM API is unreachable? → The service returns a structured 503 error response immediately with no retries.
+- What happens when `config/personality.md` exists but is empty? → The service starts normally; only programmatic behavioral instructions are injected, with no character/tone component.
+- How does a tool handle a request body it cannot parse? → Body parsing is the tool's responsibility; the service passes the raw body through.
+- What happens when a request body exceeds the configured size limit? → Request is rejected with a structured error response before reaching the agent.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The service MUST expose a health check endpoint that confirms the service is running and the agent harness is initialized.
-- **FR-002**: Every incoming HTTP request MUST be routed through the agent harness; no route handler MAY produce a response that bypasses the agent.
+- **FR-002**: Every incoming HTTP request MUST be routed through the agent harness; no route handler MAY produce a response that bypasses the agent. The agent receives the full request: method, path, headers, and raw body (no format restriction; body parsing is the responsibility of individual tools).
+- **FR-002a**: The maximum allowed request body size MUST be configurable via an environment variable; requests exceeding the limit MUST be rejected with a structured error response before reaching the agent.
 - **FR-003**: The agent MUST use registered tools as the only extension point for adding behavior; no logic MAY be embedded directly in route handlers or middleware.
 - **FR-004**: `config/personality.md` MUST be loaded at startup and injected as the system prompt on every request.
-- **FR-005**: The service MUST refuse to start if `config/personality.md` is missing, with a clear error message.
+- **FR-005**: The service MUST refuse to start if `config/personality.md` is missing, with a clear error message. An empty file is valid — the service starts normally with no character/tone injected.
 - **FR-006**: Practical agent instructions (available tools, behavioral constraints) MUST be injected programmatically at runtime, kept separate from `config/personality.md`.
 - **FR-007**: All configuration MUST be declared in a `pydantic-settings` `BaseSettings` subclass; hard-coded configuration values in source files are forbidden.
 - **FR-008**: The service MUST refuse to start if any required configuration value is absent, with a clear error identifying the missing value.
@@ -82,6 +84,7 @@ A developer adds a new tool to the agent — following the established pattern �
 - **FR-011**: The boilerplate MUST include a test suite setup with at least one passing example test for the example tool's contract, exercised in isolation before agent wiring.
 - **FR-012**: The service MUST return consistent, structured error responses for all unhandled errors; no raw stack traces MAY reach API consumers.
 - **FR-013**: The boilerplate MUST include a setup guide sufficient for a developer with no prior knowledge to run the service locally.
+- **FR-014**: When the LLM provider is unreachable, the service MUST return a structured 503 error response immediately, with no retry attempts.
 
 ### Key Entities
 
@@ -101,6 +104,17 @@ A developer adds a new tool to the agent — following the established pattern �
 - **SC-004**: Adding a new tool following the boilerplate pattern requires changes in at most 2 files for a basic tool with independent test coverage.
 - **SC-005**: The included test suite runs and passes in a clean environment with a single command.
 - **SC-006**: Changing only `config/personality.md` (no code changes) produces a measurably different agent tone in responses after restart.
+
+## Clarifications
+
+### Session 2026-05-19
+
+- Q: What is the shape of the HTTP interface through which the agent receives requests? → A: All routes forwarded — the agent receives the full raw request including method, path, body, and headers.
+- Q: Is there a configurable limit on incoming request size? → A: Yes — maximum request body size is configurable via an environment variable.
+- Q: How does the service behave when the LLM API is unreachable? → A: Return a structured 503 error response immediately — no retries.
+- Q: What happens when `config/personality.md` exists but is empty? → A: The service starts normally — no character is injected into the system prompt; only the programmatic behavioral instructions apply.
+- Q: What happens when the agent receives a request that no registered tool can handle? → A: Behavior is governed by the system prompt — the personality and injected behavioral instructions determine how the agent responds; no hardcoded fallback is applied.
+- Q: What request body formats does the service accept? → A: Any format — the body is forwarded as raw bytes/string; parsing is the responsibility of the agent or individual tools.
 
 ## Assumptions
 
