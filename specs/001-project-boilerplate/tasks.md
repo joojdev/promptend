@@ -18,10 +18,10 @@
 
 **Purpose**: Project initialization — directory structure, dependency manifest, configuration files.
 
-- [ ] T001 Create project directory structure: `src/agent/`, `src/api/`, `src/config/`, `src/tools/`, `tests/unit/tools/`, `tests/integration/`, `config/`
-- [ ] T002 Create `pyproject.toml` with runtime dependencies (fastapi, uvicorn[standard], langgraph, langchain-core, pydantic-settings, python-dotenv, structlog), dev dependencies (pytest, pytest-asyncio, httpx, ruff), and ruff + pytest configuration sections
-- [ ] T003 [P] Create `.env.example` listing all environment variables: required (LLM_API_KEY, LLM_MODEL) and optional with defaults (HOST, PORT, MAX_REQUEST_BODY_SIZE)
-- [ ] T004 [P] Create `config/personality.md` with a placeholder persona text so the service starts after a plain clone without manual configuration
+- [x] T001 Create project directory structure: `src/agent/`, `src/api/`, `src/config/`, `src/tools/`, `tests/unit/tools/`, `tests/integration/`, `config/`
+- [x] T002 Create `pyproject.toml` with runtime dependencies (fastapi, uvicorn[standard], langgraph, langchain-core, pydantic-settings, python-dotenv, structlog), dev dependencies (pytest, pytest-asyncio, httpx, ruff), and ruff + pytest configuration sections
+- [x] T003 [P] Create `.env.example` listing all environment variables: required (LLM_API_KEY, LLM_MODEL) and optional with defaults (HOST, PORT, MAX_REQUEST_BODY_SIZE)
+- [x] T004 [P] Create `config/personality.md` with a placeholder persona text so the service starts after a plain clone without manual configuration
 
 ---
 
@@ -31,9 +31,9 @@
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T005 Create all `__init__.py` files: `src/agent/__init__.py`, `src/api/__init__.py`, `src/config/__init__.py`, `src/tools/__init__.py`, `tests/__init__.py`, `tests/unit/__init__.py`, `tests/unit/tools/__init__.py`, `tests/integration/__init__.py`
-- [ ] T006 [P] Create `src/config/settings.py` stub — empty `BaseSettings` subclass (fields added in US1 implementation)
-- [ ] T007 [P] Create `src/api/errors.py` stub — empty module (handlers added in US1 implementation)
+- [x] T005 Create all `__init__.py` files: `src/agent/__init__.py`, `src/api/__init__.py`, `src/config/__init__.py`, `src/tools/__init__.py`, `tests/__init__.py`, `tests/unit/__init__.py`, `tests/unit/tools/__init__.py`, `tests/integration/__init__.py`
+- [x] T006 [P] Create `src/config/settings.py` stub — empty `BaseSettings` subclass (fields added in US1 implementation)
+- [x] T007 [P] Create `src/api/errors.py` stub — empty module (handlers added in US1 implementation)
 
 **Checkpoint**: Module stubs in place — user story phases can begin.
 
@@ -47,21 +47,21 @@
 
 ### Tests — Write and confirm FAILING before implementing (Constitution Principle III)
 
-- [ ] T008 [P] [US1] Write failing test: `GET /health` returns 200 with `{"status":"ok","agent":"ready"}` in `tests/integration/test_harness.py` (use FastAPI `TestClient`)
-- [ ] T009 [P] [US1] Write failing test: request to any path returns JSON body with `"reply"` key in `tests/integration/test_harness.py` (use `FakeListChatModel` from `langchain_core` configured to emit a `respond` tool call)
-- [ ] T010 [P] [US1] Write failing test: service startup raises `SystemExit` when a required environment variable is absent in `tests/unit/test_startup.py`
-- [ ] T011 [P] [US1] Write failing test: service startup raises `SystemExit` when `config/personality.md` is missing in `tests/unit/test_startup.py`
-- [ ] T012 [P] [US2] Write failing test: harness system prompt contains both the personality file content and the programmatic instruction block as distinct sections in `tests/unit/test_harness.py`
-- [ ] T013 [P] [US2] Write failing test: harness with an empty `config/personality.md` starts successfully and system prompt contains only the programmatic instruction block (no character section) in `tests/unit/test_harness.py`
+- [x] T008 [P] [US1] Write failing test: `GET /health` returns 200 with `{"status":"ok","agent":"ready"}` in `tests/integration/test_harness.py` (use FastAPI `TestClient`)
+- [x] T009 [P] [US1] Write failing test: request to any path returns JSON body with `"reply"` key in `tests/integration/test_harness.py` (use `FakeListChatModel` from `langchain_core` configured to emit a `respond` tool call)
+- [x] T010 [P] [US1] Write failing test: service startup raises `SystemExit` when a required environment variable is absent in `tests/unit/test_startup.py`
+- [x] T011 [P] [US1] Write failing test: service startup raises `SystemExit` when `config/personality.md` is missing in `tests/unit/test_startup.py`
+- [x] T012 [P] [US2] Write failing test: harness system prompt contains both the personality file content and the programmatic instruction block as distinct sections in `tests/unit/test_harness.py`
+- [x] T013 [P] [US2] Write failing test: harness with an empty `config/personality.md` starts successfully and system prompt contains only the programmatic instruction block (no character section) in `tests/unit/test_harness.py`
 
 ### Implementation
 
-- [ ] T014 [US1] Implement `src/config/settings.py` — `BaseSettings` subclass with all fields from `data-model.md` (Settings entity), module-level instantiation, `try/except ValidationError` at entry point → `sys.exit(1)` with formatted error
-- [ ] T015 [US1] Implement `src/agent/registry.py` — module-level `TOOLS: list` (initially empty; respond tool added in US3)
-- [ ] T016 [US1] Implement `src/agent/harness.py` — load `config/personality.md` (raise `SystemExit` if missing; empty file is valid), assemble system prompt (personality content + programmatic instruction block as separate constant; programmatic block MUST instruct agent to always call `respond` when ready to reply), call `create_react_agent` from `langgraph.prebuilt` with model, tools from registry, and a `recursion_limit` hard ceiling
-- [ ] T017 [US1] Implement `src/api/errors.py` — FastAPI exception handlers for: `HTTPException(413)` → structured JSON `{"error":"request_too_large","message":"..."}`, LLM provider error → 503 structured JSON, unhandled `Exception` → 500 structured JSON; no raw stack traces in any response
-- [ ] T018 [US1] Implement `src/api/app.py` — FastAPI app factory with `lifespan` context manager (configure structlog JSON renderer, validate settings, load personality, initialize harness); register error handlers from `errors.py`; add `GET /health` endpoint
-- [ ] T019 [US1] Add catch-all route to `src/api/app.py` — `api_route("/{full_path:path}", methods=[...all methods])`, enforce `MAX_REQUEST_BODY_SIZE` before reading body (raise `HTTPException(status_code=413)` if exceeded), pass `IncomingRequest` (method, path, headers, raw body, query params) to harness, return `{"reply": agent_response}`; emit structlog event with method, path, and response status on every request
+- [x] T014 [US1] Implement `src/config/settings.py` — `BaseSettings` subclass with all fields from `data-model.md` (Settings entity), module-level instantiation, `try/except ValidationError` at entry point → `sys.exit(1)` with formatted error
+- [x] T015 [US1] Implement `src/agent/registry.py` — module-level `TOOLS: list` (initially empty; respond tool added in US3)
+- [x] T016 [US1] Implement `src/agent/harness.py` — load `config/personality.md` (raise `SystemExit` if missing; empty file is valid), assemble system prompt (personality content + programmatic instruction block as separate constant; programmatic block MUST instruct agent to always call `respond` when ready to reply), call `create_react_agent` from `langgraph.prebuilt` with model, tools from registry, and a `recursion_limit` hard ceiling
+- [x] T017 [US1] Implement `src/api/errors.py` — FastAPI exception handlers for: `HTTPException(413)` → structured JSON `{"error":"request_too_large","message":"..."}`, LLM provider error → 503 structured JSON, unhandled `Exception` → 500 structured JSON; no raw stack traces in any response
+- [x] T018 [US1] Implement `src/api/app.py` — FastAPI app factory with `lifespan` context manager (configure structlog JSON renderer, validate settings, load personality, initialize harness); register error handlers from `errors.py`; add `GET /health` endpoint
+- [x] T019 [US1] Add catch-all route to `src/api/app.py` — `api_route("/{full_path:path}", methods=[...all methods])`, enforce `MAX_REQUEST_BODY_SIZE` before reading body (raise `HTTPException(status_code=413)` if exceeded), pass `IncomingRequest` (method, path, headers, raw body, query params) to harness, return `{"reply": agent_response}`; emit structlog event with method, path, and response status on every request
 
 **Checkpoint**: US1 complete — `pytest tests/integration/test_harness.py tests/unit/test_startup.py tests/unit/test_harness.py` all green; service starts and routes requests through the agent.
 
@@ -75,7 +75,7 @@
 
 ### Implementation
 
-- [ ] T020 [US2] Update `src/agent/harness.py` — extract programmatic instruction constant into a clearly named variable; document the assembly rule (`personality_content + "\n\n" + PROGRAMMATIC_INSTRUCTIONS`); add structured log line on startup indicating whether personality content was loaded or empty
+- [x] T020 [US2] Update `src/agent/harness.py` — extract programmatic instruction constant into a clearly named variable; document the assembly rule (`personality_content + "\n\n" + PROGRAMMATIC_INSTRUCTIONS`); add structured log line on startup indicating whether personality content was loaded or empty
 
 **Checkpoint**: US2 complete — `pytest tests/unit/test_harness.py` green (tests written in Phase 3); personality swap verified manually per `specs/001-project-boilerplate/quickstart.md`.
 
@@ -89,13 +89,13 @@
 
 ### Tests — Write and confirm FAILING before implementing (tool must not exist yet)
 
-- [ ] T021 [US3] Write failing test for respond tool contract in `tests/unit/tools/test_respond.py` — assert `tool.invoke({"reply": "hello"})` returns `"hello"`; assert `tool.invoke({"reply": ""})` raises `ToolException`; run test and confirm it fails because `src/tools/respond.py` does not exist
+- [x] T021 [US3] Write failing test for respond tool contract in `tests/unit/tools/test_respond.py` — assert `tool.invoke({"reply": "hello"})` returns `"hello"`; assert `tool.invoke({"reply": ""})` raises `ToolException`; run test and confirm it fails because `src/tools/respond.py` does not exist
 
 ### Implementation
 
-- [ ] T022 [US3] Implement `src/tools/respond.py` — `BaseTool` subclass with `name="respond"`, `description`, `args_schema` (Pydantic model with `reply: str`), `return_direct=True`, `_run` method that returns the reply string; raises `ToolException` on empty reply
-- [ ] T023 [US3] Register respond tool in `src/agent/registry.py` — import `RespondTool` and add instance to the `TOOLS` list
-- [ ] T024 [US3] Write integration test in `tests/integration/test_harness.py` — using `FakeListChatModel` configured to emit a `respond` tool call with `reply="eat my shorts"`, send `POST /api/echo {"repeat_this":"eat my shorts"}` and verify the response is `{"reply":"eat my shorts"}`
+- [x] T022 [US3] Implement `src/tools/respond.py` — `BaseTool` subclass with `name="respond"`, `description`, `args_schema` (Pydantic model with `reply: str`), `return_direct=True`, `_run` method that returns the reply string; raises `ToolException` on empty reply
+- [x] T023 [US3] Register respond tool in `src/agent/registry.py` — import `RespondTool` and add instance to the `TOOLS` list
+- [x] T024 [US3] Write integration test in `tests/integration/test_harness.py` — using `FakeListChatModel` configured to emit a `respond` tool call with `reply="eat my shorts"`, send `POST /api/echo {"repeat_this":"eat my shorts"}` and verify the response is `{"reply":"eat my shorts"}`
 
 **Checkpoint**: US3 complete — `pytest tests/unit/tools/test_respond.py` passes in full isolation (no LLM); respond tool reachable through running service.
 
@@ -103,10 +103,10 @@
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Run `ruff check src/ tests/` and `ruff format src/ tests/`, fix all reported errors, and confirm both pass clean — this is the pre-commit check; document the single test command (`pytest`) in `pyproject.toml` scripts section
-- [ ] T026 Run full test suite `pytest` in a clean virtual environment and confirm all tests pass (SC-005)
-- [ ] T027 [P] Follow `specs/001-project-boilerplate/quickstart.md` from scratch in a new venv and confirm service starts and health check responds within 10 minutes (SC-001 validation)
-- [ ] T028 [P] Manual SC-006 validation: edit `config/personality.md` to a clearly distinct persona, restart service, send a request, confirm response tone reflects the new persona
+- [x] T025 [P] Run `ruff check src/ tests/` and `ruff format src/ tests/`, fix all reported errors, and confirm both pass clean — this is the pre-commit check; document the single test command (`pytest`) in `pyproject.toml` scripts section
+- [x] T026 Run full test suite `pytest` in a clean virtual environment and confirm all tests pass (SC-005)
+- [x] T027 [P] Follow `specs/001-project-boilerplate/quickstart.md` from scratch in a new venv and confirm service starts and health check responds within 10 minutes (SC-001 validation)
+- [x] T028 [P] Manual SC-006 validation: edit `config/personality.md` to a clearly distinct persona, restart service, send a request, confirm response tone reflects the new persona
 
 ---
 
