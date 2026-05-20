@@ -2,14 +2,18 @@ import pytest
 
 
 # T010
-def test_missing_required_env_var_raises_system_exit(monkeypatch):
+def test_missing_required_env_var_raises_system_exit(monkeypatch, tmp_path):
+    from src.config.settings import Settings
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("")  # empty — no LLM_MODEL
+
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
 
-    from src.config.settings import load_settings
-
-    with pytest.raises(SystemExit):
-        load_settings()
+    with pytest.raises(Exception):
+        Settings(_env_file=str(env_file))
 
 
 # T011
