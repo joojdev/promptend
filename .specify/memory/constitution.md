@@ -34,9 +34,14 @@ Deferred TODOs: None
 The LangChain agent IS the request harness. Every incoming HTTP request MUST
 be routed through the agent — no handler MAY produce a response that bypasses
 it. The agent orchestrates execution via tools; tools are the only sanctioned
-extension point for adding behavior. The first built-in tool returns the raw
-result of executing the original request; the agent decides what to do with
-that result, including ignoring it, rewriting it, or editorializing about it.
+extension point for adding behavior.
+
+The built-in `respond` tool (`return_direct=True`) is the designated exit
+point for the agent loop: when the agent is ready to reply, it MUST call
+`respond(reply="...")`, which immediately terminates the loop and returns the
+reply to the HTTP client. The system prompt MUST instruct the agent to always
+end by calling `respond`. LangGraph's `recursion_limit` acts as a hard ceiling
+in case the agent fails to call it.
 
 New capabilities are added as tools registered on the agent — never as logic
 embedded directly in route handlers or middleware.

@@ -80,8 +80,8 @@ A developer adds a new tool to the agent â€” following the established pattern â
 - **FR-007**: All configuration MUST be declared in a `pydantic-settings` `BaseSettings` subclass; hard-coded configuration values in source files are forbidden.
 - **FR-008**: The service MUST refuse to start if any required configuration value is absent, with a clear error identifying the missing value.
 - **FR-009**: The service MUST emit structured log output for startup, request activity, and application events.
-- **FR-010**: The boilerplate MUST include at least one example tool, demonstrating the pattern for inputs, outputs, error handling, and independent testing.
-- **FR-011**: The boilerplate MUST include a test suite setup with at least one passing example test for the example tool's contract, exercised in isolation before agent wiring.
+- **FR-010**: The boilerplate MUST include a built-in `respond` tool (`return_direct=True`) as the designated agent exit point; the agent MUST call it to terminate the loop and return a reply. This tool also serves as the pattern demonstration for inputs, outputs, error handling, and independent testing.
+- **FR-011**: The boilerplate MUST include a test suite setup with at least one passing example test for the `respond` tool's contract, exercised in isolation before agent wiring.
 - **FR-012**: The service MUST return consistent, structured error responses for all unhandled errors; no raw stack traces MAY reach API consumers.
 - **FR-013**: The boilerplate MUST include a setup guide sufficient for a developer with no prior knowledge to run the service locally.
 - **FR-014**: When the LLM provider is unreachable, the service MUST return a structured 503 error response immediately, with no retry attempts.
@@ -90,7 +90,7 @@ A developer adds a new tool to the agent â€” following the established pattern â
 
 - **Service**: The HTTP server process, responsible for accepting requests and delegating all handling to the agent harness.
 - **Agent Harness**: The LangChain agent instance that orchestrates every request â€” decides which tools to invoke and constructs the final response. LangChain is the mandated agent framework for this project.
-- **Tool**: A discrete, independently testable capability registered on the agent. Each tool has a defined contract: inputs, outputs, and error cases.
+- **Tool**: A discrete, independently testable capability registered on the agent. Each tool has a defined contract: inputs, outputs, and error cases. The built-in `respond` tool is the designated exit point: when called, it terminates the agent loop and returns the reply to the HTTP client.
 - **Personality**: The character/tone definition in `config/personality.md`, loaded at startup and used as the agent's system prompt.
 - **Configuration**: The set of validated environment-backed settings that control service behavior across environments.
 

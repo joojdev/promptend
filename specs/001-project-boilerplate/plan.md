@@ -83,14 +83,16 @@ src/
 │   └── settings.py      # BaseSettings subclass; all env-backed config
 └── tools/
     ├── __init__.py
-    └── echo.py          # Example tool (echo request back)
+    └── respond.py       # Built-in respond tool (return_direct=True) — agent exit point
 
 tests/
 ├── unit/
+│   ├── test_startup.py      # Startup failure tests (missing env var, missing personality)
+│   ├── test_harness.py      # System prompt assembly tests
 │   └── tools/
-│       └── test_echo.py # Example tool contract test (isolated, no agent)
+│       └── test_respond.py  # Respond tool contract test (isolated, no agent)
 └── integration/
-    └── test_harness.py  # Agent + route integration test
+    └── test_harness.py      # Agent + route integration test
 
 config/
 └── personality.md       # User-editable personality/tone file (checked into repo)

@@ -106,4 +106,6 @@ All tests should pass in a clean environment. The example tool test runs in isol
 5. Register the tool in `src/agent/registry.py`
 6. The agent can now use the tool on all subsequent requests
 
-See `src/tools/echo.py` and `tests/unit/tools/test_echo.py` for the complete example.
+See `src/tools/respond.py` and `tests/unit/tools/test_respond.py` for the complete example.
+
+**Note**: `src/tools/respond.py` is the built-in agent exit point (`return_direct=True`). Do not remove or replace it — the agent loop depends on it to terminate cleanly.

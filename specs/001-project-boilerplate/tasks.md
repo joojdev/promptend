@@ -48,20 +48,22 @@
 ### Tests — Write and confirm FAILING before implementing (Constitution Principle III)
 
 - [ ] T008 [P] [US1] Write failing test: `GET /health` returns 200 with `{"status":"ok","agent":"ready"}` in `tests/integration/test_harness.py` (use FastAPI `TestClient`)
-- [ ] T009 [P] [US1] Write failing test: request to any path returns JSON body with `"reply"` key in `tests/integration/test_harness.py` (use `FakeListChatModel` from `langchain_core` to avoid real LLM calls)
+- [ ] T009 [P] [US1] Write failing test: request to any path returns JSON body with `"reply"` key in `tests/integration/test_harness.py` (use `FakeListChatModel` from `langchain_core` configured to emit a `respond` tool call)
 - [ ] T010 [P] [US1] Write failing test: service startup raises `SystemExit` when a required environment variable is absent in `tests/unit/test_startup.py`
 - [ ] T011 [P] [US1] Write failing test: service startup raises `SystemExit` when `config/personality.md` is missing in `tests/unit/test_startup.py`
+- [ ] T012 [P] [US2] Write failing test: harness system prompt contains both the personality file content and the programmatic instruction block as distinct sections in `tests/unit/test_harness.py`
+- [ ] T013 [P] [US2] Write failing test: harness with an empty `config/personality.md` starts successfully and system prompt contains only the programmatic instruction block (no character section) in `tests/unit/test_harness.py`
 
 ### Implementation
 
-- [ ] T012 [US1] Implement `src/config/settings.py` — `BaseSettings` subclass with all fields from `data-model.md` (Settings entity), module-level instantiation, `try/except ValidationError` at entry point → `sys.exit(1)` with formatted error
-- [ ] T013 [US1] Implement `src/agent/registry.py` — module-level `TOOLS: list` (initially empty; echo tool added in US3)
-- [ ] T014 [US1] Implement `src/agent/harness.py` — load `config/personality.md` (raise `SystemExit` if missing; empty file is valid), assemble system prompt (personality content + programmatic instruction block as separate constant), call `create_react_agent` from `langgraph.prebuilt` with model and tools from registry
-- [ ] T015 [US1] Implement `src/api/errors.py` — FastAPI exception handlers for: `RequestBodyTooLarge` → 413 structured JSON, LLM provider error → 503 structured JSON, unhandled `Exception` → 500 structured JSON; no raw stack traces in any response
-- [ ] T016 [US1] Implement `src/api/app.py` — FastAPI app factory with `lifespan` context manager (configure structlog JSON renderer, validate settings, load personality, initialize harness); register error handlers from `errors.py`; add `GET /health` endpoint
-- [ ] T017 [US1] Add catch-all route to `src/api/app.py` — `api_route("/{full_path:path}", methods=[...all methods])`, enforce `MAX_REQUEST_BODY_SIZE` before reading body, pass `IncomingRequest` (method, path, headers, raw body, query params) to harness, return `{"reply": agent_response}`
+- [ ] T014 [US1] Implement `src/config/settings.py` — `BaseSettings` subclass with all fields from `data-model.md` (Settings entity), module-level instantiation, `try/except ValidationError` at entry point → `sys.exit(1)` with formatted error
+- [ ] T015 [US1] Implement `src/agent/registry.py` — module-level `TOOLS: list` (initially empty; respond tool added in US3)
+- [ ] T016 [US1] Implement `src/agent/harness.py` — load `config/personality.md` (raise `SystemExit` if missing; empty file is valid), assemble system prompt (personality content + programmatic instruction block as separate constant; programmatic block MUST instruct agent to always call `respond` when ready to reply), call `create_react_agent` from `langgraph.prebuilt` with model, tools from registry, and a `recursion_limit` hard ceiling
+- [ ] T017 [US1] Implement `src/api/errors.py` — FastAPI exception handlers for: `HTTPException(413)` → structured JSON `{"error":"request_too_large","message":"..."}`, LLM provider error → 503 structured JSON, unhandled `Exception` → 500 structured JSON; no raw stack traces in any response
+- [ ] T018 [US1] Implement `src/api/app.py` — FastAPI app factory with `lifespan` context manager (configure structlog JSON renderer, validate settings, load personality, initialize harness); register error handlers from `errors.py`; add `GET /health` endpoint
+- [ ] T019 [US1] Add catch-all route to `src/api/app.py` — `api_route("/{full_path:path}", methods=[...all methods])`, enforce `MAX_REQUEST_BODY_SIZE` before reading body (raise `HTTPException(status_code=413)` if exceeded), pass `IncomingRequest` (method, path, headers, raw body, query params) to harness, return `{"reply": agent_response}`; emit structlog event with method, path, and response status on every request
 
-**Checkpoint**: US1 complete — `pytest tests/integration/test_harness.py tests/unit/test_startup.py` all green; service starts and routes requests through the agent.
+**Checkpoint**: US1 complete — `pytest tests/integration/test_harness.py tests/unit/test_startup.py tests/unit/test_harness.py` all green; service starts and routes requests through the agent.
 
 ---
 
@@ -71,46 +73,40 @@
 
 **Independent Test**: Edit `config/personality.md` to a distinct persona, restart service, send the same request — response tone reflects the new persona.
 
-### Tests — Write and confirm FAILING before implementing
-
-- [ ] T018 [P] [US2] Write failing test: harness system prompt contains both the personality file content and the programmatic instruction block as distinct sections in `tests/unit/test_harness.py`
-- [ ] T019 [P] [US2] Write failing test: harness with an empty `config/personality.md` starts successfully and system prompt contains only the programmatic instruction block (no character section) in `tests/unit/test_harness.py`
-
 ### Implementation
 
 - [ ] T020 [US2] Update `src/agent/harness.py` — extract programmatic instruction constant into a clearly named variable; document the assembly rule (`personality_content + "\n\n" + PROGRAMMATIC_INSTRUCTIONS`); add structured log line on startup indicating whether personality content was loaded or empty
 
-**Checkpoint**: US2 complete — `pytest tests/unit/test_harness.py` green; personality swap verified manually per `specs/001-project-boilerplate/quickstart.md`.
+**Checkpoint**: US2 complete — `pytest tests/unit/test_harness.py` green (tests written in Phase 3); personality swap verified manually per `specs/001-project-boilerplate/quickstart.md`.
 
 ---
 
 ## Phase 5: User Story 3 — Adding a New Tool (Priority: P3)
 
-**Goal**: The echo tool demonstrates the complete TDD tool pattern: isolated contract test (no agent/LLM) → implementation → registration → agent invocation.
+**Goal**: The respond tool demonstrates the complete TDD tool pattern: isolated contract test (no agent/LLM) → implementation → registration → agent invocation. `respond` is also the built-in agent exit point: when the agent calls it, the loop terminates and the reply is returned to the HTTP client.
 
-**Independent Test**: `pytest tests/unit/tools/test_echo.py` passes with no LLM API calls; `curl -X POST http://localhost:8000/ -d "echo this"` returns a reply that reflects echo tool usage.
+**Independent Test**: `pytest tests/unit/tools/test_respond.py` passes with no LLM API calls; `curl -X POST http://localhost:8000/api/echo -d '{"repeat_this":"eat my shorts"}'` returns `{"reply":"eat my shorts"}`.
 
 ### Tests — Write and confirm FAILING before implementing (tool must not exist yet)
 
-- [ ] T021 [US3] Write failing test for echo tool contract in `tests/unit/tools/test_echo.py` — assert `tool.invoke({"input": "hello"})` returns the expected echoed value; assert `tool.invoke({"input": ""})` raises `ToolException`; run test and confirm it fails because `src/tools/echo.py` does not exist
+- [ ] T021 [US3] Write failing test for respond tool contract in `tests/unit/tools/test_respond.py` — assert `tool.invoke({"reply": "hello"})` returns `"hello"`; assert `tool.invoke({"reply": ""})` raises `ToolException`; run test and confirm it fails because `src/tools/respond.py` does not exist
 
 ### Implementation
 
-- [ ] T022 [US3] Implement `src/tools/echo.py` — `BaseTool` subclass with `name`, `description`, `args_schema` (Pydantic model with `input: str`), `_run` method that returns the input string; raises `ToolException` on empty input
-- [ ] T023 [US3] Register echo tool in `src/agent/registry.py` — import `EchoTool` and add instance to the `TOOLS` list
-- [ ] T024 [US3] Write integration test in `tests/integration/test_harness.py` — using `FakeListChatModel` configured to emit a tool call for echo, verify the agent invokes the tool and incorporates its output into the final reply
+- [ ] T022 [US3] Implement `src/tools/respond.py` — `BaseTool` subclass with `name="respond"`, `description`, `args_schema` (Pydantic model with `reply: str`), `return_direct=True`, `_run` method that returns the reply string; raises `ToolException` on empty reply
+- [ ] T023 [US3] Register respond tool in `src/agent/registry.py` — import `RespondTool` and add instance to the `TOOLS` list
+- [ ] T024 [US3] Write integration test in `tests/integration/test_harness.py` — using `FakeListChatModel` configured to emit a `respond` tool call with `reply="eat my shorts"`, send `POST /api/echo {"repeat_this":"eat my shorts"}` and verify the response is `{"reply":"eat my shorts"}`
 
-**Checkpoint**: US3 complete — `pytest tests/unit/tools/test_echo.py` passes in full isolation (no LLM); echo tool reachable through running service.
+**Checkpoint**: US3 complete — `pytest tests/unit/tools/test_respond.py` passes in full isolation (no LLM); respond tool reachable through running service.
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Run `ruff check src/ tests/` and fix all reported linting errors
-- [ ] T026 [P] Run `ruff format src/ tests/` and confirm no formatting changes remain
-- [ ] T027 Run full test suite `pytest` in a clean virtual environment and confirm all tests pass (SC-005)
-- [ ] T028 [P] Follow `specs/001-project-boilerplate/quickstart.md` from scratch in a new venv and confirm service starts and health check responds within 10 minutes (SC-001 validation)
-- [ ] T029 [P] Verify `ruff check` and `ruff format` pass as a pre-commit check; document the single command to run tests in `pyproject.toml` scripts or Makefile
+- [ ] T025 [P] Run `ruff check src/ tests/` and `ruff format src/ tests/`, fix all reported errors, and confirm both pass clean — this is the pre-commit check; document the single test command (`pytest`) in `pyproject.toml` scripts section
+- [ ] T026 Run full test suite `pytest` in a clean virtual environment and confirm all tests pass (SC-005)
+- [ ] T027 [P] Follow `specs/001-project-boilerplate/quickstart.md` from scratch in a new venv and confirm service starts and health check responds within 10 minutes (SC-001 validation)
+- [ ] T028 [P] Manual SC-006 validation: edit `config/personality.md` to a clearly distinct persona, restart service, send a request, confirm response tone reflects the new persona
 
 ---
 
@@ -121,14 +117,14 @@
 - **Setup (Phase 1)**: No dependencies — start immediately
 - **Foundational (Phase 2)**: Depends on Phase 1 completion — BLOCKS all user stories
 - **US1 (Phase 3)**: Depends on Phase 2; no dependency on US2 or US3
-- **US2 (Phase 4)**: Depends on US1 (`harness.py` must exist to test personality assembly)
+- **US2 (Phase 4)**: Depends on US1 (`harness.py` must exist to implement personality assembly); US2 tests written in Phase 3
 - **US3 (Phase 5)**: Depends on US1 (`registry.py` must exist); tool unit tests (T021–T022) are independently runnable once `BaseTool` import is available
 - **Polish (Phase 6)**: Depends on all desired stories being complete
 
 ### User Story Dependencies
 
 - **US1 (P1)**: No story dependencies — foundational harness and app
-- **US2 (P2)**: Depends on US1 (`harness.py` exists)
+- **US2 (P2)**: Depends on US1 (`harness.py` exists); tests written in Phase 3 (red until T020)
 - **US3 (P3)**: Depends on US1 (`registry.py` exists); tool unit tests are independent of the agent
 
 ### Within Each User Story
@@ -143,20 +139,21 @@
 
 - T003, T004 (Setup): can run in parallel
 - T006, T007 (Foundational stubs): can run in parallel
-- T008, T009, T010, T011 (US1 tests): all can be written in parallel
-- T018, T019 (US2 tests): can be written in parallel
-- T025, T026, T028, T029 (Polish): can run in parallel
+- T008, T009, T010, T011, T012, T013 (Phase 3 tests): all can be written in parallel
+- T025, T027, T028 (Polish): can run in parallel
 
 ---
 
-## Parallel Example: User Story 1 Tests
+## Parallel Example: Phase 3 Tests
 
 ```bash
-# Write all four US1 failing tests simultaneously (different functions/files):
+# Write all six Phase 3 failing tests simultaneously (different functions/files):
 Task: "Write failing test T008: health check in tests/integration/test_harness.py"
 Task: "Write failing test T009: agent catch-all route in tests/integration/test_harness.py"
 Task: "Write failing test T010: missing env var startup failure in tests/unit/test_startup.py"
 Task: "Write failing test T011: missing personality.md startup failure in tests/unit/test_startup.py"
+Task: "Write failing test T012: system prompt sections in tests/unit/test_harness.py"
+Task: "Write failing test T013: empty personality harness in tests/unit/test_harness.py"
 ```
 
 ---
@@ -176,7 +173,7 @@ Task: "Write failing test T011: missing personality.md startup failure in tests/
 1. Setup + Foundational → module stubs in place
 2. **US1** → running service, agent harness active → MVP
 3. **US2** → personality customization verified
-4. **US3** → example tool pattern complete, extensibility demonstrated
+4. **US3** → respond tool (agent exit point) complete, extensibility demonstrated
 5. Polish → production-quality code style, validated quickstart
 
 ### TDD Constraint (NON-NEGOTIABLE per Constitution Principle III)
@@ -189,7 +186,9 @@ Red → Green → Refactor for every implementation unit. No production code wit
 
 - `[P]` tasks operate on different files with no incomplete-task dependencies — safe to parallelize
 - Tests are **mandatory**, not optional — Constitution Principle III applies to every phase
-- `FakeListChatModel` (from `langchain_core.language_models.fake_chat_models`) allows testing LangGraph agent routes without real LLM calls
+- `FakeListChatModel` (from `langchain_core.language_models.fake_chat_models`) allows testing LangGraph agent routes without real LLM calls; configure it to emit a `respond` tool call for integration tests
 - `ToolException` (from `langchain_core.tools`) is the standard error type for tool contract failures
+- The `respond` tool uses `return_direct=True` — LangGraph returns its output directly as the final agent response, terminating the loop
+- `recursion_limit` on `create_react_agent` is the hard ceiling if the agent fails to call `respond`
 - Commit after each task or logical group per constitution development workflow
 - Stop at each checkpoint to independently validate the story before proceeding to the next
