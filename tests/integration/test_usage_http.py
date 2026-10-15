@@ -163,3 +163,39 @@ def test_usage_headers_exposed_to_cors(make_app):
         r = c.get("/hello", headers={"Origin": "http://example.com"})
     exposed = {h.strip().lower() for h in r.headers["access-control-expose-headers"].split(",")}
     assert set(ALL_USAGE) <= exposed
+
+
+PRICES = {"LLM_PRICE_INPUT_PER_MTOK": "3", "LLM_PRICE_OUTPUT_PER_MTOK": "15"}
+
+
+def test_cost_header_and_log_with_prices(make_app):
+    app = make_app(_two_steps(), **PRICES)
+    with capture_logs() as logs:
+        with _client(app) as c:
+            r = c.get("/hello")
+    assert r.headers["x-dopamine-cost-usd"] == "0.001500"
+    entry = next(e for e in logs if e["event"] == "request")
+    assert entry["cost_usd"] == "0.001500"
+
+
+def _agent_sets_cost():
+    return make_queued_llm(
+        ai_tool_call(
+            "respond",
+            {"body": "hi", "headers": {"X-Dopamine-Cost-USD": "42"}},
+            tokens_in=250,
+            tokens_out=50,
+        )
+    )
+
+
+def test_agent_set_cost_replaced(make_app):
+    with _client(make_app(_agent_sets_cost(), **PRICES)) as c:
+        r = c.get("/hello")
+    assert r.headers.get_list("x-dopamine-cost-usd") == ["0.001500"]
+
+
+def test_agent_set_cost_removed_without_prices(make_app):
+    with _client(make_app(_agent_sets_cost())) as c:
+        r = c.get("/hello")
+    assert "x-dopamine-cost-usd" not in r.headers
