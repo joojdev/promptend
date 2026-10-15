@@ -13,6 +13,7 @@ from src.api.errors import (
     register_error_handlers,
 )
 from src.api.guards import RateLimiter, check_access_key, redact_headers
+from src.config.personality import resolve_personality
 from src.config.settings import load_settings
 
 log = structlog.get_logger()
@@ -35,7 +36,8 @@ def create_app(llm=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         global _agent
-        _agent = load_harness(settings.personality_path, llm=llm)
+        source = resolve_personality(settings)
+        _agent = load_harness(str(source.path), llm=llm, personality_preset=source.preset)
         yield
         _agent = None
 

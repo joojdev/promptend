@@ -161,7 +161,12 @@ def _build_llm_from_settings(settings) -> BaseChatModel:
 _verbose = False
 
 
-def load_harness(personality_path: str, llm: BaseChatModel | None = None):
+def load_harness(
+    personality_path: str,
+    llm: BaseChatModel | None = None,
+    *,
+    personality_preset: str | None = None,
+):
     global _verbose
 
     if not Path(personality_path).exists():
@@ -181,8 +186,11 @@ def load_harness(personality_path: str, llm: BaseChatModel | None = None):
         "harness_startup",
         personality_loaded=personality_loaded,
         personality_path=personality_path,
+        personality_preset=personality_preset,
         verbose=_verbose,
     )
+    if not personality_loaded:
+        log.warning("personality_empty", personality_path=personality_path)
 
     if llm is None:
         llm = _build_llm()

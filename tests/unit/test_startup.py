@@ -84,3 +84,90 @@ def test_header_lists_lowercased_blanks_dropped():
     names, fragments = s.sensitive_header_rule
     assert names == frozenset({"x-foo", "bar"})
     assert fragments == ("pass", "word")
+
+
+_COSMETIC_ENV = (
+    "PERSONALITY",
+    "PERSONALITY_PATH",
+    "STATE_FILE",
+    "KV_MAX_VALUE_BYTES",
+    "KV_MAX_KEYS",
+    "LLM_PRICE_INPUT_PER_MTOK",
+    "LLM_PRICE_OUTPUT_PER_MTOK",
+)
+
+
+def test_cosmetic_setting_defaults(monkeypatch):
+    for name in _COSMETIC_ENV:
+        monkeypatch.delenv(name, raising=False)
+    s = _settings()
+    assert s.personality == "default"
+    assert s.personality_path == ""
+    assert s.state_file == ""
+    assert s.kv_max_value_bytes == 65536
+    assert s.kv_max_keys == 1000
+    assert s.llm_price_input_per_mtok is None
+    assert s.llm_price_output_per_mtok is None
+
+
+def test_cosmetic_settings_env_override(monkeypatch):
+    monkeypatch.setenv("PERSONALITY", "shop")
+    monkeypatch.setenv("PERSONALITY_PATH", "custom.md")
+    monkeypatch.setenv("STATE_FILE", "state.json")
+    monkeypatch.setenv("KV_MAX_VALUE_BYTES", "10")
+    monkeypatch.setenv("KV_MAX_KEYS", "2")
+    monkeypatch.setenv("LLM_PRICE_INPUT_PER_MTOK", "3")
+    monkeypatch.setenv("LLM_PRICE_OUTPUT_PER_MTOK", "15.5")
+    s = _settings()
+    assert s.personality == "shop"
+    assert s.personality_path == "custom.md"
+    assert s.state_file == "state.json"
+    assert s.kv_max_value_bytes == 10
+    assert s.kv_max_keys == 2
+    assert s.llm_price_input_per_mtok == 3.0
+    assert s.llm_price_output_per_mtok == 15.5
+
+
+@pytest.mark.parametrize("field", ["kv_max_value_bytes", "kv_max_keys"])
+@pytest.mark.parametrize("value", [0, -1])
+def test_non_positive_kv_limits_rejected(monkeypatch, field, value):
+    for name in _COSMETIC_ENV:
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(Exception):
+        _settings(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "prices",
+    [
+        {"llm_price_input_per_mtok": 3.0},
+        {"llm_price_output_per_mtok": 15.0},
+    ],
+)
+def test_only_one_price_rejected(monkeypatch, prices):
+    for name in _COSMETIC_ENV:
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(Exception, match="LLM_PRICE_"):
+        _settings(**prices)
+
+
+@pytest.mark.parametrize(
+    "prices",
+    [
+        {"llm_price_input_per_mtok": -1.0, "llm_price_output_per_mtok": 15.0},
+        {"llm_price_input_per_mtok": 3.0, "llm_price_output_per_mtok": -0.01},
+    ],
+)
+def test_negative_price_rejected(monkeypatch, prices):
+    for name in _COSMETIC_ENV:
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(Exception, match="LLM_PRICE_"):
+        _settings(**prices)
+
+
+def test_zero_prices_accepted(monkeypatch):
+    for name in _COSMETIC_ENV:
+        monkeypatch.delenv(name, raising=False)
+    s = _settings(llm_price_input_per_mtok=0, llm_price_output_per_mtok=0)
+    assert s.llm_price_input_per_mtok == 0
+    assert s.llm_price_output_per_mtok == 0

@@ -65,3 +65,30 @@ class RaisingFakeLLM(ToolCapableFakeLLM):
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
         raise self.exc
+
+
+def ai_tool_call(
+    name: str,
+    args: dict,
+    *,
+    tokens_in: int = 0,
+    tokens_out: int = 0,
+    call_id: str | None = None,
+) -> AIMessage:
+    """AIMessage with one tool call and the given provider-reported token usage."""
+    import uuid
+
+    return AIMessage(
+        content="",
+        tool_calls=[{"name": name, "args": args, "id": call_id or f"call_{uuid.uuid4().hex}"}],
+        usage_metadata={
+            "input_tokens": tokens_in,
+            "output_tokens": tokens_out,
+            "total_tokens": tokens_in + tokens_out,
+        },
+    )
+
+
+def make_queued_llm(*messages: AIMessage) -> CountingFakeLLM:
+    """CountingFakeLLM that emits `messages` in order, with fresh per-instance lists."""
+    return CountingFakeLLM(responses=[""], queued_messages=list(messages), calls=0, prompts=[])
