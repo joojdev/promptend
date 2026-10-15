@@ -108,3 +108,22 @@ def test_create_app_exits_early_when_provider_package_missing(monkeypatch, capsy
         create_app()
 
     assert "uv sync --extra openai" in capsys.readouterr().err
+
+
+def test_build_tools_includes_kv_tools():
+    from src.agent.registry import TOOLS, build_tools
+    from src.state.kv_store import KVStore
+
+    tools = build_tools(KVStore(max_value_bytes=10, max_keys=1))
+    names = [t.name for t in tools]
+    assert names[: len(TOOLS)] == [t.name for t in TOOLS]
+    assert set(names) == {t.name for t in TOOLS} | {"kv_set", "kv_get", "kv_list", "kv_delete"}
+
+
+def test_programmatic_instructions_have_storage_section():
+    from src.agent.harness import PROGRAMMATIC_INSTRUCTIONS
+
+    assert "## Storage" in PROGRAMMATIC_INSTRUCTIONS
+    section = PROGRAMMATIC_INSTRUCTIONS.split("## Storage", 1)[1]
+    for word in ("kv_set", "kv_get", "kv_list", "kv_delete", "<collection>/<id>"):
+        assert word in section
