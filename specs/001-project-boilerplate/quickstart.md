@@ -56,12 +56,25 @@ MAX_REQUEST_BODY_SIZE=1048576
 
 ### 5. Configure the agent personality
 
-The file `config/personality.md` defines the agent's character and tone. A placeholder is included in the repo. Edit it to give the agent a persona:
+The agent's character and tone come from a Markdown preset in `config/personalities/`.
+Pick one by name with `PERSONALITY` (default: `default`):
+
+| Preset | Character |
+|--------|-----------|
+| `default` | Neutral, helpful API |
+| `shop` | Online store selling absurd products, consistent catalog and orders |
+| `sarcastic` | Correct REST data with passive-aggressive messages |
+| `website` | Every path is an HTML page of an imaginary website |
+| `teapot` | Answers 418 I'm a teapot to everything, philosophically |
 
 ```bash
-# Edit config/personality.md with your preferred text editor
-# Leave it empty to use no personality (only behavioral constraints apply)
+# .env
+PERSONALITY=teapot
 ```
+
+To use your own persona, set `PERSONALITY_PATH` to any Markdown file; it wins over
+`PERSONALITY`. An empty file is valid (only behavioral constraints apply). To add a preset,
+drop a new `<name>.md` file into `config/personalities/` — no code changes needed.
 
 ### 6. Start the service
 
@@ -71,7 +84,7 @@ python -m uvicorn src.api.app:app --reload
 
 If the service starts successfully, you will see structured JSON log output confirming it is running.
 
-If `config/personality.md` is missing or a required environment variable is absent, the service will refuse to start and print a clear error message.
+If `PERSONALITY` names an unknown preset (the error lists the available ones), `PERSONALITY_PATH` points to a missing file, or a required environment variable is absent, the service will refuse to start and print a clear error message.
 
 ### 7. Verify it works
 
