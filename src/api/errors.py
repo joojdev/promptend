@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from src.api.usage_headers import apply_usage
+
 
 class LLMUnavailableError(Exception):
     pass
@@ -26,6 +28,10 @@ class RateLimitedError(Exception):
     pass
 
 
+def _with_usage(request: Request, response: JSONResponse) -> JSONResponse:
+    return apply_usage(request, response, method=request.method, path=request.url.path)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
@@ -44,43 +50,47 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(LLMUnavailableError)
     async def llm_unavailable_handler(request: Request, exc: LLMUnavailableError):
-        return JSONResponse(
+        response = JSONResponse(
             status_code=503,
             content={
                 "error": "llm_unavailable",
                 "message": "The AI service is currently unavailable. Please try again later.",
             },
         )
+        return _with_usage(request, response)
 
     @app.exception_handler(AgentNoResponseError)
     async def agent_no_response_handler(request: Request, exc: AgentNoResponseError):
-        return JSONResponse(
+        response = JSONResponse(
             status_code=502,
             content={
                 "error": "agent_no_response",
                 "message": "The agent finished without producing a response.",
             },
         )
+        return _with_usage(request, response)
 
     @app.exception_handler(AgentTimeoutError)
     async def agent_timeout_handler(request: Request, exc: AgentTimeoutError):
-        return JSONResponse(
+        response = JSONResponse(
             status_code=504,
             content={
                 "error": "agent_timeout",
                 "message": "The agent did not respond in time.",
             },
         )
+        return _with_usage(request, response)
 
     @app.exception_handler(AgentLoopLimitError)
     async def agent_loop_limit_handler(request: Request, exc: AgentLoopLimitError):
-        return JSONResponse(
+        response = JSONResponse(
             status_code=500,
             content={
                 "error": "agent_loop_limit",
                 "message": "The agent exceeded its step limit without producing a response.",
             },
         )
+        return _with_usage(request, response)
 
     @app.exception_handler(UnauthorizedError)
     async def unauthorized_handler(request: Request, exc: UnauthorizedError):
@@ -95,10 +105,11 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
-        return JSONResponse(
+        response = JSONResponse(
             status_code=500,
             content={
                 "error": "internal_error",
                 "message": "An unexpected error occurred.",
             },
         )
+        return _with_usage(request, response)

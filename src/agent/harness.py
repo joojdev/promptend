@@ -9,6 +9,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
 from src.agent.registry import build_tools
+from src.agent.usage import UsageTracker
 from src.api.errors import (
     AgentLoopLimitError,
     AgentNoResponseError,
@@ -355,7 +356,9 @@ def _classify_messages(messages: list) -> dict:
     raise AgentNoResponseError()
 
 
-async def invoke_agent(agent, incoming: dict, timeout_seconds: float = 30) -> dict:
+async def invoke_agent(
+    agent, incoming: dict, timeout_seconds: float = 30, usage: UsageTracker | None = None
+) -> dict:
     message_text = (
         f"Method: {incoming['method']}\n"
         f"Path: {incoming['path']}\n"
@@ -363,11 +366,14 @@ async def invoke_agent(agent, incoming: dict, timeout_seconds: float = 30) -> di
         f"Headers: {incoming['headers']}\n"
         f"Body: {incoming['body']}"
     )
+    config = {"recursion_limit": 25}
+    if usage is not None:
+        config["callbacks"] = [usage]
     try:
         result = await asyncio.wait_for(
             agent.ainvoke(
                 {"messages": [{"role": "user", "content": message_text}]},
-                config={"recursion_limit": 25},
+                config=config,
             ),
             timeout=timeout_seconds,
         )
