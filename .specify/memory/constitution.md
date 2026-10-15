@@ -1,30 +1,36 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
+Version change: 1.1.0 → 1.2.0
 
 Modified principles:
-  - I. Agent-as-Harness (title unchanged): added "Infrastructure guards" exception
-    paragraph, allowing guards (body size, access key, rate limit, agent-failure
-    mapping) to respond without the agent under explicit limits. Formalizes existing
-    413/503 behavior and the 002-chores-hardening 401/429/502/504 responses.
+  - I. Agent-as-Harness (title unchanged): added "Response metadata" paragraph.
+    Infrastructure MAY annotate agent-produced responses with run metadata
+    (003-cosmetic-features usage headers) but MUST NOT change status or body.
+  - II. Customizable Personality (title unchanged): presets are now allowed.
+    Shipped presets live in `config/personalities/`; `PERSONALITY` selects one,
+    `PERSONALITY_PATH` overrides with a custom file. The "MUST exist" rule now
+    applies to the resolved personality file. Removed "No pre-defined personality
+    presets".
 
 Modified standards:
-  - Configuration & Standards: dependency management now states pyproject.toml + uv
-    (matches repo; pip remains supported). Patch-level wording fix.
+  - Configuration & Standards: "No long-term memory" replaced. Conversation memory
+    stays out of scope (each request starts without history); explicit state
+    through bounded storage tools is allowed.
 
 Added sections: None
 Removed sections: None
 
-Bump rationale: MINOR — materially expanded guidance on Principle I; no principle
-removed or redefined incompatibly.
+Bump rationale: MINOR — rules relaxed in a backward-compatible way (a custom
+personality file still works and still fails startup when missing); no
+principle removed.
 
 Templates requiring updates:
   ✅ .specify/templates/plan-template.md — Constitution Check reads constitution at runtime
   ✅ .specify/templates/spec-template.md — no change needed
   ✅ .specify/templates/tasks-template.md — no change needed
-  ⚠ specs/002-chores-hardening/plan.md — change "⚠️ JUSTIFIED" for Principle I to PASS
-    and trim Complexity Tracking; tasks.md T025 now obsolete (amendment applied)
+  ⚠ specs/001-project-boilerplate/quickstart.md — still describes config/personality.md;
+    updated by 003-cosmetic-features implementation
 
 Deferred TODOs: None
 -->
@@ -59,6 +65,12 @@ provider unavailable, step limit). Guards MUST NOT generate successful (2xx)
 responses, MUST NOT add behavior a tool could provide, and MUST be covered by
 tests proving the agent was not invoked on rejection.
 
+Response metadata: infrastructure MAY add headers describing the agent run
+(e.g. token usage, step count, estimated cost) to responses the agent produced
+or failed to produce. It MUST NOT change the status code or body chosen by the
+agent, and system metadata headers take precedence over same-named headers the
+agent sets.
+
 **Rationale**: The harness model keeps the agent as the single decision-maker
 and makes the system trivially extensible: drop in a new tool, the agent gains
 a new capability without touching routing code. This is also what makes the
@@ -66,23 +78,29 @@ project comedically coherent — the AI literally runs the backend.
 
 ### II. Customizable Personality
 
-The agent's character is defined in `config/personality.md`, a plain Markdown
-file editable directly by the user without touching source code. This file is
-loaded at startup and injected as the system prompt on every request.
+The agent's character is defined in a plain Markdown file editable directly by
+the user without touching source code. The project ships presets in
+`config/personalities/<name>.md`; the `PERSONALITY` setting selects one by name
+(default `default`), and `PERSONALITY_PATH` points to a custom file and takes
+priority when set. The resolved file is loaded at startup and injected as the
+system prompt on every request.
 
 Rules:
-- `config/personality.md` MUST exist; the server MUST refuse to start if it
-  is missing.
+- The resolved personality file MUST exist; the server MUST refuse to start if
+  it is missing or if `PERSONALITY` names no available preset (listing the
+  available ones).
+- Presets are discovered from the files in `config/personalities/`; adding a
+  preset MUST NOT require a code change.
 - Practical instructions (available tools, behavioral constraints) MUST be
   injected programmatically at runtime and kept separate from the personality
-  file. The personality file is for character/tone only.
+  file. The personality file is for character/tone only, and presets MUST NOT
+  contradict the programmatic instructions.
 - The personality is stateless — it is re-read at startup, not per-request.
   Live reloading is out of scope for v1.
-- No pre-defined personality presets. The user writes the prompt directly.
 
-**Rationale**: Keeping the personality in a user-facing `config/` file makes
-the comedic premise immediately accessible — anyone cloning the repo can
-reshape the agent's character without reading a line of code.
+**Rationale**: Keeping the personality in user-facing `config/` files makes
+the comedic premise immediately accessible — anyone cloning the repo can pick
+a preset or reshape the agent's character without reading a line of code.
 
 ### III. Test-First (NON-NEGOTIABLE)
 
@@ -125,7 +143,9 @@ the joke and makes the codebase hard to extend.
 - Dependency management: `pyproject.toml` with `uv` (`uv.lock` is committed);
   `pip install -e .` remains a supported alternative.
 - Code style: `ruff` for linting and formatting. All commits MUST pass `ruff check`.
-- No long-term memory in scope for v1. The agent is stateless per request.
+- No conversation memory in scope for v1: each request starts without history.
+  Explicit state is allowed only through storage tools with configured size and
+  key-count limits.
 
 ## Development Workflow
 
@@ -149,4 +169,4 @@ Amendments require:
 3. Propagation check across all `.specify/templates/` files.
 4. Updated `LAST_AMENDED_DATE`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15
+**Version**: 1.2.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15
