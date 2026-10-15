@@ -76,6 +76,36 @@ To use your own persona, set `PERSONALITY_PATH` to any Markdown file; it wins ov
 `PERSONALITY`. An empty file is valid (only behavioral constraints apply). To add a preset,
 drop a new `<name>.md` file into `config/personalities/` — no code changes needed.
 
+#### Agent storage
+
+The agent has a key-value store (`kv_set`, `kv_get`, `kv_list`, `kv_delete`) shared by all
+requests, so a resource created with `POST /users` shows up in a later `GET /users`.
+
+```bash
+# .env
+# STATE_FILE=./state.json   # unset = in-memory, empty on every start
+KV_MAX_VALUE_BYTES=65536    # max size of one value (compact UTF-8 JSON bytes)
+KV_MAX_KEYS=1000            # max number of keys
+```
+
+With `STATE_FILE` set, the store is loaded at startup (empty if the file does not exist) and
+saved atomically after every change, so it survives restarts. An invalid state file stops
+startup. Both limits must be positive; a write over a limit is reported to the agent, which
+still answers the request.
+
+#### Usage headers and cost
+
+Every agent-produced response (including agent failures like 502/504) carries
+`X-Dopamine-Tokens-In`, `X-Dopamine-Tokens-Out` and `X-Dopamine-Steps` (tool calls); the same
+numbers appear in the `request` log line. To also get `X-Dopamine-Cost-USD`, set your
+provider's prices in USD per million tokens — both or neither; no prices ship with the project:
+
+```bash
+# .env
+# LLM_PRICE_INPUT_PER_MTOK=3
+# LLM_PRICE_OUTPUT_PER_MTOK=15
+```
+
 ### 6. Start the service
 
 ```bash
@@ -104,6 +134,10 @@ curl -X POST http://localhost:8000/hello -d "Are you awake?"
 ```
 
 The agent will process the request using its personality and available tools and return a `{"reply": "..."}` response.
+
+Add `-i` to see the usage headers (`x-dopamine-tokens-in`, `x-dopamine-tokens-out`,
+`x-dopamine-steps`, and `x-dopamine-cost-usd` when prices are set). `/health` and requests
+rejected before the agent runs (401, 413, 429) have none.
 
 ## Running Tests
 
