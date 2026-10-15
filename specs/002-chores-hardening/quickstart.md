@@ -16,17 +16,21 @@ Expected: all pass; each spec scenario maps to one test. Rejection tests assert 
 
 ## Manual smoke checks (real server)
 
-Start with a low limit and a key:
+> The shared access key (`DOPAMINE_ACCESS_KEY` / `X-Dopamine-Key`) was replaced by bearer
+> tokens in [004-cleanup](../004-cleanup/quickstart.md). Steps below use a user token.
+
+Start with a low limit and a user token:
 
 ```bash
-RATE_LIMIT_PER_MINUTE=3 DOPAMINE_ACCESS_KEY=s3cret AGENT_VERBOSE=true uv run uvicorn src.api.app:app
+TOKEN=$(uv run tokens create smoke | sed -n 2p)
+RATE_LIMIT_PER_MINUTE=3 AGENT_VERBOSE=true uv run uvicorn src.api.app:app
 ```
 
-1. No key → `curl -i localhost:8000/x` → `401`, no agent log line.
-2. Wrong key → `curl -i -H 'X-Dopamine-Key: nope' localhost:8000/x` → `401`.
-3. Right key, 4 quick calls → first 3 reach the agent, 4th returns `429 {"error":"rate_limited"}`.
-4. `/health` stays `200` throughout, with or without the key.
-5. Redaction: with verbose logging on, send `-H 'Authorization: Bearer abc' -H 'X-Custom-Token: t'` and confirm the logged agent input shows `[REDACTED]` for both and the real values appear nowhere.
+1. No token → `curl -i localhost:8000/x` → `401`, no agent log line.
+2. Wrong token → `curl -i -H 'Authorization: Bearer nope' localhost:8000/x` → `401`.
+3. Valid token, 4 quick calls → first 3 reach the agent, 4th returns `429 {"error":"rate_limited"}`.
+4. `/health` stays `200` throughout, with or without the token.
+5. Redaction: with verbose logging on, send `-H 'Authorization: Bearer $TOKEN' -H 'X-Custom-Token: t'` and confirm the logged agent input has no `Authorization` header, shows `[REDACTED]` for `X-Custom-Token`, and the real values appear nowhere.
 6. Timeout: `AGENT_TIMEOUT_SECONDS=0.001` → `504 agent_timeout`.
 
 Details: [contracts/http-errors.md](contracts/http-errors.md), [data-model.md](data-model.md).

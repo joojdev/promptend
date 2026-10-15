@@ -1,7 +1,9 @@
 import asyncio
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
+import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import Runnable
@@ -92,3 +94,34 @@ def ai_tool_call(
 def make_queued_llm(*messages: AIMessage) -> CountingFakeLLM:
     """CountingFakeLLM that emits `messages` in order, with fresh per-instance lists."""
     return CountingFakeLLM(responses=[""], queued_messages=list(messages), calls=0, prompts=[])
+
+
+@pytest.fixture(autouse=True)
+def _auth_defaults(monkeypatch, tmp_path):
+    """Per-test token store and auth disabled, so tests that do not care about auth pass."""
+    monkeypatch.setenv("TOKENS_DB_PATH", str(tmp_path / "tokens.db"))
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    monkeypatch.delenv("ADMIN_USERNAME", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD_HASH", raising=False)
+
+
+def fast_hash(password: str) -> str:
+    """Argon2 hash with low-cost parameters (tests only)."""
+    from argon2 import PasswordHasher
+
+    return PasswordHasher(time_cost=1, memory_cost=8, parallelism=1).hash(password)
+
+
+def enable_auth(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+
+
+def admin_env(monkeypatch, username: str = "admin", password: str = "pw") -> None:
+    monkeypatch.setenv("ADMIN_USERNAME", username)
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", fast_hash(password))
+
+
+def user_token(db_path: str | Path, name: str = "test") -> str:
+    from src.auth.tokens import TokenStore
+
+    return TokenStore(db_path).create_user_token(name).token

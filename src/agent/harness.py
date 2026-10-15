@@ -9,6 +9,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
 from src.agent.registry import build_tools
+from src.agent.roles import tools_for_role
 from src.agent.usage import UsageTracker
 from src.api.errors import (
     AgentLoopLimitError,
@@ -185,6 +186,7 @@ def load_harness(
     store: KVStore | None = None,
     *,
     personality_preset: str | None = None,
+    role: str = "user",
 ):
     global _verbose
 
@@ -204,8 +206,12 @@ def load_harness(
     if store is None:
         store = KVStore(settings.kv_max_value_bytes, settings.kv_max_keys)
 
+    tools = tools_for_role(build_tools(store), role)
+
     log.info(
         "harness_startup",
+        role=role,
+        tools=[t.name for t in tools],
         personality_loaded=personality_loaded,
         personality_path=personality_path,
         personality_preset=personality_preset,
@@ -221,7 +227,7 @@ def load_harness(
 
     agent = create_react_agent(
         llm,
-        build_tools(store),
+        tools,
         prompt=SystemMessage(content=system_prompt),
         checkpointer=None,
     )

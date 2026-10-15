@@ -27,7 +27,7 @@ def _run_one(llm):
         with TestClient(app) as client:
             response = client.get("/hello")
     startup = [e for e in logs if e["event"] == "harness_startup"]
-    assert len(startup) == 1
+    assert sorted(e["role"] for e in startup) == ["admin", "user"]  # one agent per role
     return response, startup[0]
 
 

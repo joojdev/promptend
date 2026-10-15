@@ -1,0 +1,3 @@
+.specify/** linguist-vendored
+.claude/** linguist-vendored
+specs/** linguist-documentation

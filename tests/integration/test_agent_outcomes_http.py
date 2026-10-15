@@ -49,7 +49,7 @@ def test_loose_text_warning_header(make_client):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("text/plain")
     assert r.text == "pong"
-    assert r.headers["x-dopamine-warning"] == "agent did not use a response tool"
+    assert r.headers["x-promptend-warning"] == "agent did not use a response tool"
 
 
 def test_timeout_504(make_client):

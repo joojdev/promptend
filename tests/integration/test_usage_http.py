@@ -3,10 +3,16 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 from structlog.testing import capture_logs
 
-from tests.conftest import RaisingFakeLLM, SlowFakeLLM, ai_tool_call, make_queued_llm
+from tests.conftest import (
+    RaisingFakeLLM,
+    SlowFakeLLM,
+    ai_tool_call,
+    enable_auth,
+    make_queued_llm,
+)
 
-USAGE = ("x-dopamine-tokens-in", "x-dopamine-tokens-out", "x-dopamine-steps")
-ALL_USAGE = (*USAGE, "x-dopamine-cost-usd")
+USAGE = ("x-promptend-tokens-in", "x-promptend-tokens-out", "x-promptend-steps")
+ALL_USAGE = (*USAGE, "x-promptend-cost-usd")
 
 
 @pytest.fixture()
@@ -18,7 +24,6 @@ def make_app(monkeypatch, tmp_path):
     monkeypatch.setenv("PERSONALITY_PATH", str(persona))
     for name in (
         "STATE_FILE",
-        "DOPAMINE_ACCESS_KEY",
         "RATE_LIMIT_PER_MINUTE",
         "LLM_PRICE_INPUT_PER_MTOK",
         "LLM_PRICE_OUTPUT_PER_MTOK",
@@ -57,7 +62,7 @@ def test_success_headers_and_log(make_app):
             r = c.get("/hello")
     assert r.status_code == 200
     assert _usage(r) == ("250", "50", "2")
-    assert "x-dopamine-cost-usd" not in r.headers
+    assert "x-promptend-cost-usd" not in r.headers
     requests = [e for e in logs if e["event"] == "request"]
     assert len(requests) == 1
     entry = requests[0]
@@ -70,7 +75,7 @@ def test_agent_set_usage_headers_overridden(make_app):
     llm = make_queued_llm(
         ai_tool_call(
             "respond",
-            {"body": "hi", "headers": {"X-Dopamine-Steps": "999", "x-dopamine-tokens-in": "1"}},
+            {"body": "hi", "headers": {"X-Promptend-Steps": "999", "x-promptend-tokens-in": "1"}},
             tokens_in=7,
             tokens_out=3,
         )
@@ -78,8 +83,8 @@ def test_agent_set_usage_headers_overridden(make_app):
     with _client(make_app(llm)) as c:
         r = c.get("/hello")
     assert _usage(r) == ("7", "3", "1")
-    assert len(r.headers.get_list("x-dopamine-steps")) == 1
-    assert len(r.headers.get_list("x-dopamine-tokens-in")) == 1
+    assert len(r.headers.get_list("x-promptend-steps")) == 1
+    assert len(r.headers.get_list("x-promptend-tokens-in")) == 1
 
 
 def test_respond_with_file_carries_headers(make_app):
@@ -97,7 +102,7 @@ def test_loose_text_reply_carries_headers(make_app):
     )
     with _client(make_app(make_queued_llm(msg))) as c:
         r = c.get("/ping")
-    assert r.headers["x-dopamine-warning"] == "agent did not use a response tool"
+    assert r.headers["x-promptend-warning"] == "agent did not use a response tool"
     assert _usage(r) == ("10", "5", "0")
 
 
@@ -139,8 +144,9 @@ def test_timeout_504_has_headers_and_log(make_app):
     assert len(requests) == 1 and requests[0]["status"] == 504
 
 
-def test_guard_rejections_and_health_have_no_usage_headers(make_app):
-    with _client(make_app(_two_steps(), DOPAMINE_ACCESS_KEY="s3cret")) as c:
+def test_guard_rejections_and_health_have_no_usage_headers(monkeypatch, make_app):
+    enable_auth(monkeypatch)
+    with _client(make_app(_two_steps())) as c:
         r = c.get("/a")
         health = c.get("/health")
     assert r.status_code == 401
@@ -173,7 +179,7 @@ def test_cost_header_and_log_with_prices(make_app):
     with capture_logs() as logs:
         with _client(app) as c:
             r = c.get("/hello")
-    assert r.headers["x-dopamine-cost-usd"] == "0.001500"
+    assert r.headers["x-promptend-cost-usd"] == "0.001500"
     entry = next(e for e in logs if e["event"] == "request")
     assert entry["cost_usd"] == "0.001500"
 
@@ -182,7 +188,7 @@ def _agent_sets_cost():
     return make_queued_llm(
         ai_tool_call(
             "respond",
-            {"body": "hi", "headers": {"X-Dopamine-Cost-USD": "42"}},
+            {"body": "hi", "headers": {"X-Promptend-Cost-USD": "42"}},
             tokens_in=250,
             tokens_out=50,
         )
@@ -192,10 +198,10 @@ def _agent_sets_cost():
 def test_agent_set_cost_replaced(make_app):
     with _client(make_app(_agent_sets_cost(), **PRICES)) as c:
         r = c.get("/hello")
-    assert r.headers.get_list("x-dopamine-cost-usd") == ["0.001500"]
+    assert r.headers.get_list("x-promptend-cost-usd") == ["0.001500"]
 
 
 def test_agent_set_cost_removed_without_prices(make_app):
     with _client(make_app(_agent_sets_cost())) as c:
         r = c.get("/hello")
-    assert "x-dopamine-cost-usd" not in r.headers
+    assert "x-promptend-cost-usd" not in r.headers

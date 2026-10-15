@@ -27,7 +27,8 @@ def test_secret_headers_never_reach_llm(monkeypatch, tmp_path):
         )
     assert response.status_code == 200
     prompt = "\n".join(llm.prompts)
-    assert prompt.count("[REDACTED]") >= 3
+    assert prompt.count("[REDACTED]") >= 2
+    assert "authorization" not in prompt.lower()
     for secret in ("abc123", "sid=zzz", "'tok'"):
         assert secret not in prompt
     assert "ua-test" in prompt

@@ -13,11 +13,9 @@ def make_client(monkeypatch, tmp_path):
     monkeypatch.setenv("LLM_MODEL", "fake-model")
     monkeypatch.setenv("PERSONALITY_PATH", str(personality))
 
-    def _make(limit=None, key=None, client=("testclient", 50000)):
+    def _make(limit=None, client=("testclient", 50000)):
         if limit is not None:
             monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", str(limit))
-        if key is not None:
-            monkeypatch.setenv("DOPAMINE_ACCESS_KEY", key)
         llm = CountingFakeLLM(responses=["pong"], prompts=[])
         from src.api.app import create_app
 
@@ -70,44 +68,11 @@ def test_window_elapsed_allows_again(monkeypatch, make_client):
         assert c.get("/a").status_code == 200
 
 
-def test_key_missing_401(make_client):
-    c, llm = make_client(key="s3cret")
-    with c:
-        r = c.get("/a")
-    assert r.status_code == 401
-    assert r.json()["error"] == "unauthorized"
-    assert llm.calls == 0
-
-
-def test_key_wrong_401(make_client):
-    c, llm = make_client(key="s3cret")
-    with c:
-        r = c.get("/a", headers={"X-Dopamine-Key": "nope"})
-    assert r.status_code == 401
-    assert llm.calls == 0
-
-
-def test_key_correct_200_and_not_forwarded(make_client):
-    c, llm = make_client(key="s3cret")
-    with c:
-        r = c.get("/a", headers={"X-Dopamine-Key": "s3cret"})
-    assert r.status_code == 200
-    prompt = "\n".join(llm.prompts)
-    assert "x-dopamine-key" not in prompt.lower()
-    assert "s3cret" not in prompt
-
-
-def test_no_key_configured_open(make_client):
-    c, _ = make_client()
+def test_health_exempt(make_client):
+    c, _ = make_client(limit=1)
     with c:
         assert c.get("/a").status_code == 200
-
-
-def test_health_exempt(make_client):
-    c, _ = make_client(limit=1, key="s3cret")
-    with c:
-        assert c.get("/a", headers={"X-Dopamine-Key": "s3cret"}).status_code == 200
-        assert c.get("/a", headers={"X-Dopamine-Key": "s3cret"}).status_code == 429
+        assert c.get("/a").status_code == 429
         assert c.get("/health").status_code == 200
 
 
@@ -118,15 +83,3 @@ def test_oversized_body_413_no_llm(monkeypatch, make_client):
         r = c.post("/a", content="x" * 100)
     assert r.status_code == 413
     assert llm.calls == 0
-
-
-def test_wrong_key_401_not_429_and_does_not_count(make_client):
-    c, llm = make_client(limit=1, key="s3cret")
-    ok = {"X-Dopamine-Key": "s3cret"}
-    with c:
-        assert c.get("/a", headers={"X-Dopamine-Key": "bad"}).status_code == 401
-        assert c.get("/a", headers={"X-Dopamine-Key": "bad"}).status_code == 401
-        assert c.get("/a", headers=ok).status_code == 200
-        assert c.get("/a", headers=ok).status_code == 429
-        assert c.get("/a", headers={"X-Dopamine-Key": "bad"}).status_code == 401
-    assert llm.calls == 1

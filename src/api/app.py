@@ -1,4 +1,5 @@
 import base64
+import sys
 from contextlib import asynccontextmanager
 
 import structlog
@@ -7,27 +8,36 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
+from src.agent.roles import ROLES
 from src.agent.usage import UsageTracker
+from src.api.admin import build_admin_router
+from src.api.auth import authenticate
 from src.api.errors import (
     RateLimitedError,
     UnauthorizedError,
     register_error_handlers,
 )
-from src.api.guards import RateLimiter, check_access_key, redact_headers
+from src.api.guards import RateLimiter, redact_headers
 from src.api.usage_headers import USAGE_HEADERS, apply_usage
+from src.auth.passwords import InvalidAdminHash, validate_hash
+from src.auth.tokens import TokenStore
 from src.config.personality import resolve_personality
 from src.config.settings import load_settings
 from src.state.kv_store import KVStore
 
 log = structlog.get_logger()
 
-_agent = None
-
 
 def create_app(llm=None) -> FastAPI:
     settings = load_settings()
     if llm is None:
         ensure_provider_installed(settings)
+    if settings.admin_password_hash:
+        try:
+            validate_hash(settings.admin_password_hash)
+        except InvalidAdminHash as exc:
+            print(f"Configuration error: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     structlog.configure(
         processors=[
@@ -36,16 +46,30 @@ def create_app(llm=None) -> FastAPI:
         ]
     )
 
+    agents: dict = {}
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        global _agent
+        if not settings.admin_enabled:
+            log.warning("admin_routes_disabled")
+        if not settings.auth_enabled:
+            log.warning("auth_disabled")
         source = resolve_personality(settings)
         store = KVStore.from_settings(settings)
-        _agent = load_harness(
-            str(source.path), llm=llm, store=store, personality_preset=source.preset
+        agents.update(
+            {
+                role: load_harness(
+                    str(source.path),
+                    llm=llm,
+                    store=store,
+                    personality_preset=source.preset,
+                    role=role,
+                )
+                for role in ROLES
+            }
         )
         yield
-        _agent = None
+        agents.clear()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.llm_prices = (settings.llm_price_input_per_mtok, settings.llm_price_output_per_mtok)
@@ -58,6 +82,8 @@ def create_app(llm=None) -> FastAPI:
     )
     register_error_handlers(app)
     limiter = RateLimiter(settings.rate_limit_per_minute)
+    token_store = TokenStore(settings.tokens_db_path)
+    app.include_router(build_admin_router(token_store, settings))
 
     @app.get("/health")
     async def health():
@@ -71,10 +97,12 @@ def create_app(llm=None) -> FastAPI:
         if len(body) > settings.max_request_body_size:
             raise HTTPException(status_code=413)
 
-        if not check_access_key(
-            request.headers.get("x-dopamine-key"), settings.dopamine_access_key
-        ):
+        principal = authenticate(
+            request.headers.get("authorization"), token_store, settings.auth_enabled
+        )
+        if principal is None:
             raise UnauthorizedError()
+        request.state.principal = principal
         if not limiter.check(request.client.host if request.client else "unknown"):
             raise RateLimitedError()
 
@@ -88,13 +116,15 @@ def create_app(llm=None) -> FastAPI:
 
         usage = UsageTracker()
         request.state.usage = usage
-        result = await invoke_agent(_agent, incoming, settings.agent_timeout_seconds, usage=usage)
+        result = await invoke_agent(
+            agents[principal.role], incoming, settings.agent_timeout_seconds, usage=usage
+        )
         warning = result.pop("warning", None)
 
         status_code = result["status_code"]
         headers = dict(result["headers"] or {})
         if warning:
-            headers["X-Dopamine-Warning"] = warning
+            headers["X-Promptend-Warning"] = warning
         body = result["body"]
         content_type = result["content_type"]
 

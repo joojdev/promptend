@@ -28,6 +28,10 @@ class RateLimitedError(Exception):
     pass
 
 
+class NotFoundError(Exception):
+    pass
+
+
 def _with_usage(request: Request, response: JSONResponse) -> JSONResponse:
     return apply_usage(request, response, method=request.method, path=request.url.path)
 
@@ -96,8 +100,12 @@ def register_error_handlers(app: FastAPI) -> None:
     async def unauthorized_handler(request: Request, exc: UnauthorizedError):
         return JSONResponse(
             status_code=401,
-            content={"error": "unauthorized", "message": "Missing or invalid access key."},
+            content={"error": "unauthorized"},
         )
+
+    @app.exception_handler(NotFoundError)
+    async def not_found_handler(request: Request, exc: NotFoundError):
+        return JSONResponse(status_code=404, content={"error": "not_found"})
 
     @app.exception_handler(RateLimitedError)
     async def rate_limited_handler(request: Request, exc: RateLimitedError):
