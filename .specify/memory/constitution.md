@@ -1,26 +1,30 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (template) → 1.0.0
-New constitution — initial ratification.
+Version change: 1.0.0 → 1.1.0
 
-Modified principles: N/A (first version)
+Modified principles:
+  - I. Agent-as-Harness (title unchanged): added "Infrastructure guards" exception
+    paragraph, allowing guards (body size, access key, rate limit, agent-failure
+    mapping) to respond without the agent under explicit limits. Formalizes existing
+    413/503 behavior and the 002-chores-hardening 401/429/502/504 responses.
 
-Added sections:
-  - I. Agent-as-Harness
-  - II. Customizable Personality
-  - III. Test-First (NON-NEGOTIABLE)
-  - IV. Simplicity / YAGNI
-  - Configuration & Standards
-  - Development Workflow
-  - Governance
+Modified standards:
+  - Configuration & Standards: dependency management now states pyproject.toml + uv
+    (matches repo; pip remains supported). Patch-level wording fix.
 
-Removed sections: N/A (template placeholders replaced)
+Added sections: None
+Removed sections: None
+
+Bump rationale: MINOR — materially expanded guidance on Principle I; no principle
+removed or redefined incompatibly.
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md — Constitution Check gates apply
-  ✅ .specify/templates/spec-template.md — no structural changes needed
-  ✅ .specify/templates/tasks-template.md — no structural changes needed
+  ✅ .specify/templates/plan-template.md — Constitution Check reads constitution at runtime
+  ✅ .specify/templates/spec-template.md — no change needed
+  ✅ .specify/templates/tasks-template.md — no change needed
+  ⚠ specs/002-chores-hardening/plan.md — change "⚠️ JUSTIFIED" for Principle I to PASS
+    and trim Complexity Tracking; tasks.md T025 now obsolete (amendment applied)
 
 Deferred TODOs: None
 -->
@@ -45,6 +49,15 @@ in case the agent fails to call it.
 
 New capabilities are added as tools registered on the agent — never as logic
 embedded directly in route handlers or middleware.
+
+Infrastructure guards are the one sanctioned exception to "no response without
+the agent". A guard MAY reject a request or report a failure without invoking the
+agent only when it (a) protects the agent or the LLM provider from cost, abuse or
+oversized input (body-size limit, access key, rate limit), or (b) reports an
+agent-run failure the agent cannot report about itself (no response, timeout,
+provider unavailable, step limit). Guards MUST NOT generate successful (2xx)
+responses, MUST NOT add behavior a tool could provide, and MUST be covered by
+tests proving the agent was not invoked on rejection.
 
 **Rationale**: The harness model keeps the agent as the single decision-maker
 and makes the system trivially extensible: drop in a new tool, the agent gains
@@ -109,7 +122,8 @@ the joke and makes the codebase hard to extend.
 - All settings MUST be declared in a `pydantic-settings` `BaseSettings` subclass.
   Hard-coded configuration values in source files are forbidden.
 - Python version: 3.11+.
-- Dependency management: `pip` + `requirements.txt` or `pyproject.toml`.
+- Dependency management: `pyproject.toml` with `uv` (`uv.lock` is committed);
+  `pip install -e .` remains a supported alternative.
 - Code style: `ruff` for linting and formatting. All commits MUST pass `ruff check`.
 - No long-term memory in scope for v1. The agent is stateless per request.
 
@@ -135,4 +149,4 @@ Amendments require:
 3. Propagation check across all `.specify/templates/` files.
 4. Updated `LAST_AMENDED_DATE`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-05-19
+**Version**: 1.1.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15

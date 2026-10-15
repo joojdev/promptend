@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -31,3 +32,36 @@ class ToolCapableFakeLLM(FakeListChatModel):
 
             msg = AI(content=self.responses[0] if self.responses else "")
         return ChatResult(generations=[ChatGeneration(message=msg)])
+
+
+class CountingFakeLLM(ToolCapableFakeLLM):
+    """Counts how many times the model was invoked (sync or async)."""
+
+    calls: int = 0
+    prompts: list[str] = []
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        self.calls += 1
+        self.prompts.append("\n".join(str(m.content) for m in messages))
+        return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+
+class SlowFakeLLM(ToolCapableFakeLLM):
+    delay: float = 5.0
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        await asyncio.sleep(self.delay)
+        return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+
+class RaisingFakeLLM(ToolCapableFakeLLM):
+    exc: Any = None
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        raise self.exc
+
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        raise self.exc

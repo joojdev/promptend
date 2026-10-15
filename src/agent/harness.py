@@ -1,12 +1,20 @@
+import asyncio
 import sys
 from pathlib import Path
 
 import structlog
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
 from src.agent.registry import TOOLS
+from src.api.errors import (
+    AgentLoopLimitError,
+    AgentNoResponseError,
+    AgentTimeoutError,
+    LLMUnavailableError,
+)
 
 log = structlog.get_logger()
 
@@ -81,19 +89,59 @@ def _build_llm() -> BaseChatModel:
     return _build_llm_from_settings(settings)
 
 
+def _exit_missing_provider(provider: str, package: str, core: bool = False) -> None:
+    if core:
+        hint = "Reinstall project dependencies with: uv sync"
+    else:
+        hint = f'Install it with: uv sync --extra {provider}  (or: pip install -e ".[{provider}]")'
+    print(f"Error: provider '{provider}' requires package '{package}'. {hint}", file=sys.stderr)
+    sys.exit(1)
+
+
+_PROVIDER_PACKAGES = {
+    "anthropic": ("langchain_anthropic", "langchain-anthropic", True),
+    "openai": ("langchain_openai", "langchain-openai", False),
+    "bedrock": ("langchain_aws", "langchain-aws", False),
+}
+
+
+def ensure_provider_installed(settings) -> None:
+    """Exit with an install hint if the selected provider's package is missing.
+
+    Called from create_app so the failure happens before uvicorn's lifespan startup,
+    which would otherwise print a traceback.
+    """
+    import importlib
+
+    module, package, core = _PROVIDER_PACKAGES[settings.llm_provider]
+    try:
+        importlib.import_module(module)
+    except ImportError:
+        _exit_missing_provider(settings.llm_provider, package, core=core)
+
+
 def _build_llm_from_settings(settings) -> BaseChatModel:
     if settings.llm_provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except ImportError:
+            _exit_missing_provider("anthropic", "langchain-anthropic", core=True)
 
         return ChatAnthropic(model=settings.llm_model, api_key=settings.llm_api_key)
 
     if settings.llm_provider == "openai":
-        from langchain_openai import ChatOpenAI
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            _exit_missing_provider("openai", "langchain-openai")
 
         return ChatOpenAI(model=settings.llm_model, api_key=settings.llm_api_key)
 
     if settings.llm_provider == "bedrock":
-        from langchain_aws import ChatBedrockConverse
+        try:
+            from langchain_aws import ChatBedrockConverse
+        except ImportError:
+            _exit_missing_provider("bedrock", "langchain-aws")
 
         kwargs = {"model": settings.llm_model}
         if settings.aws_profile:
@@ -148,14 +196,6 @@ def load_harness(personality_path: str, llm: BaseChatModel | None = None):
     return agent
 
 
-_FALLBACK_RESPONSE = {
-    "body": "",
-    "status_code": 200,
-    "headers": {},
-    "content_type": "application/json",
-}
-
-
 def _parse_tool_response(content) -> dict | None:
     import json
 
@@ -201,7 +241,90 @@ def _log_agent_messages(messages: list) -> None:
             )
 
 
-async def invoke_agent(agent, incoming: dict) -> dict:
+_PROVIDER_ERROR_NAMES = frozenset(
+    {
+        "APIConnectionError",
+        "APITimeoutError",
+        "AuthenticationError",
+        "PermissionDeniedError",
+        "RateLimitError",
+        "InternalServerError",
+        "OverloadedError",
+        "ServiceUnavailableError",
+        "EndpointConnectionError",
+        "ConnectTimeoutError",
+        "NoCredentialsError",
+        "ConnectError",
+    }
+)
+_PROVIDER_MODULES = frozenset({"anthropic", "openai", "botocore", "httpx", "httpcore"})
+_BEDROCK_UNAVAILABLE_CODES = frozenset(
+    {
+        "ThrottlingException",
+        "AccessDeniedException",
+        "ExpiredTokenException",
+        "UnrecognizedClientException",
+    }
+)
+
+
+def _is_provider_unavailable(exc: BaseException) -> bool:
+    for cls in type(exc).__mro__:
+        root = cls.__module__.split(".")[0]
+        if root not in _PROVIDER_MODULES:
+            continue
+        if cls.__name__ in _PROVIDER_ERROR_NAMES:
+            return True
+        if root == "botocore" and cls.__name__ == "ClientError":
+            response = getattr(exc, "response", None)
+            code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
+            if code in _BEDROCK_UNAVAILABLE_CODES:
+                return True
+    return False
+
+
+def _message_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+        return "".join(parts)
+    return ""
+
+
+def _classify_messages(messages: list) -> dict:
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage):
+            structured = _parse_tool_response(msg.content)
+            if structured:
+                return structured
+
+    for msg in reversed(messages):
+        if not isinstance(msg, AIMessage):
+            continue
+        text = _message_text(msg.content)
+        if not text.strip():
+            continue
+        structured = _parse_tool_response(text)
+        if structured:
+            return structured
+        return {
+            "body": text,
+            "status_code": 200,
+            "headers": {},
+            "content_type": "text/plain",
+            "warning": "agent did not use a response tool",
+        }
+
+    raise AgentNoResponseError()
+
+
+async def invoke_agent(agent, incoming: dict, timeout_seconds: float = 30) -> dict:
     message_text = (
         f"Method: {incoming['method']}\n"
         f"Path: {incoming['path']}\n"
@@ -209,25 +332,27 @@ async def invoke_agent(agent, incoming: dict) -> dict:
         f"Headers: {incoming['headers']}\n"
         f"Body: {incoming['body']}"
     )
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": message_text}]},
-        config={"recursion_limit": 25},
-    )
+    try:
+        result = await asyncio.wait_for(
+            agent.ainvoke(
+                {"messages": [{"role": "user", "content": message_text}]},
+                config={"recursion_limit": 25},
+            ),
+            timeout=timeout_seconds,
+        )
+    except TimeoutError as exc:
+        raise AgentTimeoutError() from exc
+    except GraphRecursionError as exc:
+        raise AgentLoopLimitError() from exc
+    except Exception as exc:
+        if _is_provider_unavailable(exc):
+            log.warning("llm_provider_unavailable", error_class=type(exc).__name__)
+            raise LLMUnavailableError() from exc
+        raise
+
     messages = result.get("messages", [])
 
     if _verbose:
         _log_agent_messages(messages)
 
-    for msg in reversed(messages):
-        if not (hasattr(msg, "content") and msg.content):
-            continue
-        structured = _parse_tool_response(msg.content)
-        if structured:
-            return structured
-        return {
-            "body": str(msg.content),
-            "status_code": 200,
-            "headers": {},
-            "content_type": "text/plain",
-        }
-    return _FALLBACK_RESPONSE
+    return _classify_messages(messages)
