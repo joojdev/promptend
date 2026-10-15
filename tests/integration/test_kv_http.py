@@ -69,3 +69,15 @@ def test_state_file_survives_new_app(env, tmp_path):
     with _client(llm) as client:
         assert client.get("/users/1").status_code == 200
     assert '"name": "Ana"' in llm.prompts[-1]
+
+
+def test_limit_violation_reported_to_agent_not_aborted(env):
+    env.setenv("KV_MAX_VALUE_BYTES", "10")
+    llm = make_queued_llm(
+        ai_tool_call("kv_set", {"key": "blobs/1", "value": "x" * 100}),
+        ai_tool_call("respond", {"body": {"error": "too large"}, "status_code": 413}),
+    )
+    with _client(llm) as client:
+        r = client.post("/blobs")
+    assert r.status_code == 413
+    assert "value too large: 102 bytes exceeds KV_MAX_VALUE_BYTES (10)" in llm.prompts[1]
