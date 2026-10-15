@@ -29,8 +29,8 @@ Templates requiring updates:
   ✅ .specify/templates/plan-template.md — Constitution Check reads constitution at runtime
   ✅ .specify/templates/spec-template.md — no change needed
   ✅ .specify/templates/tasks-template.md — no change needed
-  ⚠ specs/001-project-boilerplate/quickstart.md — still describes config/personality.md;
-    updated by 003-cosmetic-features implementation
+  ✅ specs/001-project-boilerplate/quickstart.md — personality section now describes presets
+    (updated by 003-cosmetic-features implementation)
 
 Deferred TODOs: None
 -->
