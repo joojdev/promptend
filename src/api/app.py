@@ -52,6 +52,8 @@ def create_app(llm=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         if not settings.admin_enabled:
             log.warning("admin_routes_disabled")
+        if not settings.auth_enabled:
+            log.warning("auth_disabled")
         source = resolve_personality(settings)
         store = KVStore.from_settings(settings)
         agents.update(

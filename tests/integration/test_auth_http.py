@@ -100,3 +100,30 @@ def test_credentials_never_reach_agent(monkeypatch, env):
     prompt = llm.prompts[0].lower()
     for needle in ("authorization", "x-api-key", token.lower(), "zzz"):
         assert needle not in prompt
+
+
+# --- US7: auth disabled for local development ---
+
+
+def test_auth_disabled_lets_requests_through_with_warning(env):
+    from structlog.testing import capture_logs
+
+    from src.api.app import create_app
+
+    llm = _llm()
+    app = create_app(llm=llm)
+    with capture_logs() as logs:
+        with TestClient(app) as c:
+            assert c.get("/a").status_code == 200
+            assert c.get("/a", headers=_bearer("sk_invalid")).status_code == 200
+    assert any(e["event"] == "auth_disabled" and e["log_level"] == "warning" for e in logs)
+    assert "authorization" not in llm.prompts[1].lower()
+    assert "sk_invalid" not in llm.prompts[1]
+
+
+def test_auth_enabled_by_default(monkeypatch, env):
+    monkeypatch.delenv("AUTH_ENABLED")
+    llm = _llm()
+    with _client(llm) as c:
+        assert c.get("/a").status_code == 401
+    assert llm.calls == 0

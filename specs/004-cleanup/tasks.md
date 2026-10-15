@@ -191,11 +191,11 @@ description: "Task list for Cleanup"
 
 ### Tests for User Story 7 (write first, confirm FAIL)
 
-- [ ] T040 [P] [US7] Add to `tests/integration/test_auth_http.py`: with `AUTH_ENABLED=false` (the autouse default) a token-less request → 200 and `capture_logs` shows `auth_disabled` warning at startup; an invalid bearer token → 200 (user role); `Authorization` still absent from `llm.prompts[0]`; `AUTH_ENABLED` unset (delenv) → token-less request → 401
+- [X] T040 [P] [US7] Add to `tests/integration/test_auth_http.py`: with `AUTH_ENABLED=false` (the autouse default) a token-less request → 200 and `capture_logs` shows `auth_disabled` warning at startup; an invalid bearer token → 200 (user role); `Authorization` still absent from `llm.prompts[0]`; `AUTH_ENABLED` unset (delenv) → token-less request → 401
 
 ### Implementation for User Story 7
 
-- [ ] T041 [US7] Edit `src/api/app.py`: log `auth_disabled` at warning level in `create_app` when `not settings.auth_enabled` (the decision table itself is already in `authenticate` from T017)
+- [X] T041 [US7] Edit `src/api/app.py`: log `auth_disabled` at warning level in `create_app` when `not settings.auth_enabled` (the decision table itself is already in `authenticate` from T017)
 
 **Checkpoint**: Part A complete.
 
