@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
+from src.agent.roles import ROLES
 from src.agent.usage import UsageTracker
 from src.api.admin import build_admin_router
 from src.api.auth import authenticate
@@ -25,8 +26,6 @@ from src.config.settings import load_settings
 from src.state.kv_store import KVStore
 
 log = structlog.get_logger()
-
-_agent = None
 
 
 def create_app(llm=None) -> FastAPI:
@@ -47,18 +46,28 @@ def create_app(llm=None) -> FastAPI:
         ]
     )
 
+    agents: dict = {}
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        global _agent
         if not settings.admin_enabled:
             log.warning("admin_routes_disabled")
         source = resolve_personality(settings)
         store = KVStore.from_settings(settings)
-        _agent = load_harness(
-            str(source.path), llm=llm, store=store, personality_preset=source.preset
+        agents.update(
+            {
+                role: load_harness(
+                    str(source.path),
+                    llm=llm,
+                    store=store,
+                    personality_preset=source.preset,
+                    role=role,
+                )
+                for role in ROLES
+            }
         )
         yield
-        _agent = None
+        agents.clear()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.llm_prices = (settings.llm_price_input_per_mtok, settings.llm_price_output_per_mtok)
@@ -105,7 +114,9 @@ def create_app(llm=None) -> FastAPI:
 
         usage = UsageTracker()
         request.state.usage = usage
-        result = await invoke_agent(_agent, incoming, settings.agent_timeout_seconds, usage=usage)
+        result = await invoke_agent(
+            agents[principal.role], incoming, settings.agent_timeout_seconds, usage=usage
+        )
         warning = result.pop("warning", None)
 
         status_code = result["status_code"]
