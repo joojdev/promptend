@@ -20,3 +20,6 @@ Thumbs.db
 .vscode/
 .idea/
 state.json
+
+# token store
+data/

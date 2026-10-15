@@ -171,3 +171,67 @@ def test_zero_prices_accepted(monkeypatch):
     s = _settings(llm_price_input_per_mtok=0, llm_price_output_per_mtok=0)
     assert s.llm_price_input_per_mtok == 0
     assert s.llm_price_output_per_mtok == 0
+
+
+_AUTH_ENV = (
+    "ADMIN_USERNAME",
+    "ADMIN_PASSWORD_HASH",
+    "ADMIN_TOKEN_TTL_MINUTES",
+    "LOGIN_RATE_LIMIT_PER_MINUTE",
+    "TOKENS_DB_PATH",
+    "AUTH_ENABLED",
+)
+
+
+def test_auth_setting_defaults(monkeypatch):
+    for name in _AUTH_ENV:
+        monkeypatch.delenv(name, raising=False)
+    s = _settings()
+    assert s.admin_username == ""
+    assert s.admin_password_hash == ""
+    assert s.admin_token_ttl_minutes == 60
+    assert s.login_rate_limit_per_minute == 5
+    assert s.tokens_db_path == "data/tokens.db"
+    assert s.auth_enabled is True
+    assert s.admin_enabled is False
+
+
+def test_auth_settings_env_override(monkeypatch):
+    monkeypatch.setenv("ADMIN_USERNAME", "  root  ")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", " $argon2id$x ")
+    monkeypatch.setenv("ADMIN_TOKEN_TTL_MINUTES", "15")
+    monkeypatch.setenv("LOGIN_RATE_LIMIT_PER_MINUTE", "3")
+    monkeypatch.setenv("TOKENS_DB_PATH", "/tmp/t.db")
+    monkeypatch.setenv("AUTH_ENABLED", "false")
+    s = _settings()
+    assert s.admin_username == "root"
+    assert s.admin_password_hash == "$argon2id$x"
+    assert s.admin_token_ttl_minutes == 15
+    assert s.login_rate_limit_per_minute == 3
+    assert s.tokens_db_path == "/tmp/t.db"
+    assert s.auth_enabled is False
+    assert s.admin_enabled is True
+
+
+@pytest.mark.parametrize("field", ["admin_token_ttl_minutes", "login_rate_limit_per_minute"])
+@pytest.mark.parametrize("value", [0, -1])
+def test_non_positive_auth_ints_rejected(monkeypatch, field, value):
+    for name in _AUTH_ENV:
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(Exception):
+        _settings(**{field: value})
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"admin_username": "admin"},
+        {"admin_password_hash": "$argon2id$x"},
+        {"admin_username": "  ", "admin_password_hash": "$argon2id$x"},
+        {"admin_username": "admin", "admin_password_hash": "   "},
+    ],
+)
+def test_admin_enabled_needs_both_fields(monkeypatch, fields):
+    for name in _AUTH_ENV:
+        monkeypatch.delenv(name, raising=False)
+    assert _settings(**fields).admin_enabled is False

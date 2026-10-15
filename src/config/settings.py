@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     kv_max_keys: int = 1000
     llm_price_input_per_mtok: float | None = None
     llm_price_output_per_mtok: float | None = None
+    admin_username: str = ""
+    admin_password_hash: str = ""
+    admin_token_ttl_minutes: int = 60
+    login_rate_limit_per_minute: int = 5
+    tokens_db_path: str = "data/tokens.db"
+    auth_enabled: bool = True
 
     @field_validator("llm_model")
     @classmethod
@@ -58,7 +64,12 @@ class Settings(BaseSettings):
         return v
 
     @field_validator(
-        "rate_limit_per_minute", "agent_timeout_seconds", "kv_max_value_bytes", "kv_max_keys"
+        "rate_limit_per_minute",
+        "agent_timeout_seconds",
+        "kv_max_value_bytes",
+        "kv_max_keys",
+        "admin_token_ttl_minutes",
+        "login_rate_limit_per_minute",
     )
     @classmethod
     def must_be_positive(cls, v):
@@ -84,6 +95,22 @@ class Settings(BaseSettings):
     @classmethod
     def strip_access_key(cls, v: str) -> str:
         return v.strip()
+
+    @field_validator("admin_username", "admin_password_hash")
+    @classmethod
+    def strip_admin_fields(cls, v: str) -> str:
+        return v.strip()
+
+    @field_validator("tokens_db_path")
+    @classmethod
+    def path_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty")
+        return v.strip()
+
+    @property
+    def admin_enabled(self) -> bool:
+        return bool(self.admin_username and self.admin_password_hash)
 
     @property
     def sensitive_header_rule(self) -> tuple[frozenset[str], tuple[str, ...]]:
