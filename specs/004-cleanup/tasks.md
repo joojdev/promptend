@@ -207,9 +207,9 @@ description: "Task list for Cleanup"
 
 **Independent Test**: Local `ruff check .` / `ruff format --check .` clean; workflow file valid; push shows green jobs.
 
-- [ ] T042 [US8] Edit `pyproject.toml` `[tool.ruff]`: add `extend-exclude = [".specify", ".claude"]`; run `uv run ruff check .` and `uv run ruff format --check .`; fix any finding in project files (run `uv run ruff format .` if only formatting)
-- [ ] T043 [P] [US8] Create `.github/workflows/ci.yml` per research R13: name `CI`; `on: [push, pull_request]`; job `test` on `ubuntu-latest`, `strategy.matrix.python-version: ["3.11", "3.12"]`; env `LLM_MODEL: test-model`, `LLM_API_KEY: test-key`; steps `actions/checkout@v4`, `astral-sh/setup-uv@v6` with `python-version: ${{ matrix.python-version }}`, `uv sync --locked --extra dev`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`
-- [ ] T044 [US8] Verify the code runs on Python 3.11: `uv run --isolated --python 3.11 --extra dev pytest -q` (`--isolated` keeps the project's `.venv` untouched; uv installs 3.11 if needed); fix any 3.12+-only syntax found
+- [X] T042 [US8] Edit `pyproject.toml` `[tool.ruff]`: add `extend-exclude = [".specify", ".claude"]`; run `uv run ruff check .` and `uv run ruff format --check .`; fix any finding in project files (run `uv run ruff format .` if only formatting)
+- [X] T043 [P] [US8] Create `.github/workflows/ci.yml` per research R13: name `CI`; `on: [push, pull_request]`; job `test` on `ubuntu-latest`, `strategy.matrix.python-version: ["3.11", "3.12"]`; env `LLM_MODEL: test-model`, `LLM_API_KEY: test-key`; steps `actions/checkout@v4`, `astral-sh/setup-uv@v6` with `python-version: ${{ matrix.python-version }}`, `uv sync --locked --extra dev`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`
+- [X] T044 [US8] Verify the code runs on Python 3.11: `uv run --isolated --python 3.11 --extra dev pytest -q` (`--isolated` keeps the project's `.venv` untouched; uv installs 3.11 if needed); fix any 3.12+-only syntax found
 
 **Checkpoint**: CI config ready; confirm green after push.
 
