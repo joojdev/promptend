@@ -1,4 +1,4 @@
-# dopamine
+# Promptend
 
 **An HTTP server with no routes. An LLM reads every request and decides what to answer.**
 
@@ -55,9 +55,9 @@ Tools can be restricted to admin callers by declaring `role: str = "admin"` on t
 and adding it to `build_tools()` in `src/agent/registry.py`. Requests made with an admin token
 get every tool; requests made with a user token get only user tools.
 
-Every response produced by the agent carries `X-Dopamine-Tokens-In`, `X-Dopamine-Tokens-Out`
-and `X-Dopamine-Steps`, plus `X-Dopamine-Cost-USD` when prices are configured. If the agent
-answered without calling a respond tool, `X-Dopamine-Warning` says so.
+Every response produced by the agent carries `X-Promptend-Tokens-In`, `X-Promptend-Tokens-Out`
+and `X-Promptend-Steps`, plus `X-Promptend-Cost-USD` when prices are configured. If the agent
+answered without calling a respond tool, `X-Promptend-Warning` says so.
 
 ## Quickstart
 
@@ -107,7 +107,7 @@ All settings come from environment variables or `.env`.
 | `STATE_FILE` | *(empty)* | JSON file for the key-value store; empty = in memory |
 | `KV_MAX_VALUE_BYTES` | `65536` | Max size of one stored value |
 | `KV_MAX_KEYS` | `1000` | Max number of stored keys |
-| `LLM_PRICE_INPUT_PER_MTOK` | *(unset)* | USD per million input tokens; set both prices to get `X-Dopamine-Cost-USD` |
+| `LLM_PRICE_INPUT_PER_MTOK` | *(unset)* | USD per million input tokens; set both prices to get `X-Promptend-Cost-USD` |
 | `LLM_PRICE_OUTPUT_PER_MTOK` | *(unset)* | USD per million output tokens |
 | `ADMIN_USERNAME` | *(empty)* | Admin login name; `/_admin/` answers 404 while unset |
 | `ADMIN_PASSWORD_HASH` | *(empty)* | argon2 hash from `uv run tokens hash-password`, never the plain password |

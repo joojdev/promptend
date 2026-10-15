@@ -65,4 +65,4 @@ def test_every_preset_mentioned(readme):
 
 def test_no_removed_access_key(readme):
     assert "DOPAMINE_ACCESS_KEY" not in readme
-    assert "X-Dopamine-Key" not in readme
+    assert "X-Legacy-Key" not in readme

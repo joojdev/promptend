@@ -124,7 +124,7 @@ def create_app(llm=None) -> FastAPI:
         status_code = result["status_code"]
         headers = dict(result["headers"] or {})
         if warning:
-            headers["X-Dopamine-Warning"] = warning
+            headers["X-Promptend-Warning"] = warning
         body = result["body"]
         content_type = result["content_type"]
 

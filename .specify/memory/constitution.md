@@ -1,30 +1,24 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.2.0 → 1.3.0
+Version change: 1.3.0 → 1.3.1
 
-Modified principles:
-  - I. Agent-as-Harness (title unchanged): added "Control plane" paragraph.
-    Reserved `/_admin/` routes (admin login and token management, 004-cleanup)
-    MAY respond, including 2xx, without the agent. Added "Role-scoped tools":
-    the caller's role MAY select which registered tools an agent run is offered.
+Modified principles: None (wording only)
+  - Title: project renamed from "Dopamine" to "Promptend".
 
 Modified standards: None
 Added sections: None
 Removed sections: None
 
-Bump rationale: MINOR — new bounded exception to Principle I and new guidance
-on tool exposure; no principle removed or redefined incompatibly.
+Bump rationale: PATCH — name change only; no rule changed.
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md — Constitution Check reads constitution at runtime
-  ✅ .specify/templates/spec-template.md — no change needed
-  ✅ .specify/templates/tasks-template.md — no change needed
+  ✅ .specify/templates/* — no project name in templates
 
 Deferred TODOs: None
 -->
 
-# Dopamine Constitution
+# Promptend Constitution
 
 ## Core Principles
 
@@ -169,4 +163,4 @@ Amendments require:
 3. Propagation check across all `.specify/templates/` files.
 4. Updated `LAST_AMENDED_DATE`.
 
-**Version**: 1.3.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15
+**Version**: 1.3.1 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15

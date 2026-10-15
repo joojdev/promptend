@@ -315,5 +315,5 @@ A visitor lands on the repository and, within a couple of minutes, understands w
 - The existing per-client rate limit, body-size limit and agent timeout are unchanged. Token auth is checked before the rate limit so that unauthenticated traffic does not consume rate-limit budget.
 - Timestamps are stored and shown in UTC ISO-8601.
 - Token ids are short, auto-incrementing integers, which are easy to type in the CLI.
-- The README describes the project by its current name ("dopamine"). The no-name rule applies only to artifacts created by Part A.
-- The README badges point at this repository's GitHub path (`joojdev/dopamine`) and the new workflow.
+- The project was renamed "Promptend" after Part A was built. The README uses that name, and the usage headers became `X-Promptend-*` (formerly `X-Dopamine-*`). The no-name rule in FR-024 refers to the old name.
+- The README badges point at this repository's GitHub path (`joojdev/dopamine`, unchanged until the GitHub repository itself is renamed) and the new workflow.

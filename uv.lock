@@ -372,62 +372,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dopamine"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "argon2-cffi" },
-    { name = "fastapi" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-core" },
-    { name = "langgraph" },
-    { name = "pydantic-settings" },
-    { name = "python-dotenv" },
-    { name = "structlog" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "langchain-aws" },
-    { name = "langchain-openai" },
-]
-bedrock = [
-    { name = "langchain-aws" },
-]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-openai = [
-    { name = "langchain-openai" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "argon2-cffi", specifier = ">=25.1" },
-    { name = "fastapi", specifier = ">=0.111" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
-    { name = "langchain-anthropic", specifier = ">=0.3" },
-    { name = "langchain-aws", marker = "extra == 'all'", specifier = ">=0.2" },
-    { name = "langchain-aws", marker = "extra == 'bedrock'", specifier = ">=0.2" },
-    { name = "langchain-core", specifier = ">=0.2" },
-    { name = "langchain-openai", marker = "extra == 'all'", specifier = ">=0.2" },
-    { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.2" },
-    { name = "langgraph", specifier = ">=0.2" },
-    { name = "pydantic-settings", specifier = ">=2.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
-    { name = "structlog", specifier = ">=24.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
-]
-provides-extras = ["openai", "bedrock", "all", "dev"]
-
-[[package]]
 name = "fastapi"
 version = "0.136.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1110,6 +1054,62 @@ sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
 ]
+
+[[package]]
+name = "promptend"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "argon2-cffi" },
+    { name = "fastapi" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
+    { name = "pydantic-settings" },
+    { name = "python-dotenv" },
+    { name = "structlog" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "langchain-aws" },
+    { name = "langchain-openai" },
+]
+bedrock = [
+    { name = "langchain-aws" },
+]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+openai = [
+    { name = "langchain-openai" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "argon2-cffi", specifier = ">=25.1" },
+    { name = "fastapi", specifier = ">=0.111" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "langchain-anthropic", specifier = ">=0.3" },
+    { name = "langchain-aws", marker = "extra == 'all'", specifier = ">=0.2" },
+    { name = "langchain-aws", marker = "extra == 'bedrock'", specifier = ">=0.2" },
+    { name = "langchain-core", specifier = ">=0.2" },
+    { name = "langchain-openai", marker = "extra == 'all'", specifier = ">=0.2" },
+    { name = "langchain-openai", marker = "extra == 'openai'", specifier = ">=0.2" },
+    { name = "langgraph", specifier = ">=0.2" },
+    { name = "pydantic-settings", specifier = ">=2.2" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
+    { name = "structlog", specifier = ">=24.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+]
+provides-extras = ["openai", "bedrock", "all", "dev"]
 
 [[package]]
 name = "pycparser"

@@ -34,8 +34,8 @@ def test_credential_headers_dropped(name):
 
 
 def test_former_access_key_header_is_masked_like_any_key():
-    out = redact_headers({"x-dopamine-key": "k"}, NAMES, FRAGMENTS)
-    assert out == {"x-dopamine-key": "[REDACTED]"}
+    out = redact_headers({"x-legacy-key": "k"}, NAMES, FRAGMENTS)
+    assert out == {"x-legacy-key": "[REDACTED]"}
 
 
 def test_custom_rule_overrides_defaults():
