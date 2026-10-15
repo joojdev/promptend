@@ -221,10 +221,10 @@ description: "Task list for Cleanup"
 
 **Independent Test**: Files exist with the required content; `.specify/` and `specs/` still present.
 
-- [ ] T045 [P] [US9] Add to `tests/unit/test_repo_files.py`: `.gitattributes` contains `.specify/** linguist-vendored`, `.claude/** linguist-vendored`, `specs/** linguist-documentation`; `LICENSE` starts with `MIT License` and contains `Copyright (c) 2026 João Vitor Piovezan`; `pyproject.toml` declares `license = "MIT"`; directories `.specify/` and `specs/` exist
-- [ ] T046 [P] [US9] Create `.gitattributes` with the three lines above
-- [ ] T047 [P] [US9] Create `LICENSE` with the standard MIT text, year 2026, holder `João Vitor Piovezan`
-- [ ] T048 [US9] Edit `pyproject.toml`: `license = "MIT"`, `license-files = ["LICENSE"]`, `[build-system] requires = ["setuptools>=77"]`; run `uv lock` if needed and `uv sync --extra dev`
+- [X] T045 [P] [US9] Add to `tests/unit/test_repo_files.py`: `.gitattributes` contains `.specify/** linguist-vendored`, `.claude/** linguist-vendored`, `specs/** linguist-documentation`; `LICENSE` starts with `MIT License` and contains `Copyright (c) 2026 João Vitor Piovezan`; `pyproject.toml` declares `license = "MIT"`; directories `.specify/` and `specs/` exist
+- [X] T046 [P] [US9] Create `.gitattributes` with the three lines above
+- [X] T047 [P] [US9] Create `LICENSE` with the standard MIT text, year 2026, holder `João Vitor Piovezan`
+- [X] T048 [US9] Edit `pyproject.toml`: `license = "MIT"`, `license-files = ["LICENSE"]`, `[build-system] requires = ["setuptools>=77"]`; run `uv lock` if needed and `uv sync --extra dev`
 
 **Checkpoint**: Part B complete.
 
