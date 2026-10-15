@@ -304,3 +304,9 @@ Task: "T032 config/personalities/teapot.md"
 
 - A test that would need the real LLM is out of scope (spec: "LLM behavior is not tested"); the only real-LLM step is T056.
 - The fake LLM cannot read tool output, so storage integration tests assert on the prompt of the LLM call that follows the tool call (`CountingFakeLLM.prompts`).
+
+---
+
+## Phase 13: Convergence
+
+- [X] T057 Document `STATE_FILE` (unset = in-memory; loaded at startup, saved atomically after every change), `KV_MAX_VALUE_BYTES` / `KV_MAX_KEYS` limits, the `X-Dopamine-Tokens-In` / `-Tokens-Out` / `-Steps` / `-Cost-USD` response headers, and the `LLM_PRICE_INPUT_PER_MTOK` / `LLM_PRICE_OUTPUT_PER_MTOK` settings (both or neither, no defaults shipped) in the user-facing quickstart `specs/001-project-boilerplate/quickstart.md` (e.g. a new "Agent storage" subsection and a "Usage headers" note next to "7. Verify it works"), which today covers only personality presets per FR-029 (partial)
