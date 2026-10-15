@@ -1,5 +1,7 @@
 from langchain_core.tools import BaseTool
 
+from src.state.kv_store import KVStore
+from src.tools.kv import KVDeleteTool, KVGetTool, KVListTool, KVSetTool
 from src.tools.list_files import ListFilesTool
 from src.tools.read_file import ReadFileTool
 from src.tools.respond import RespondTool, RespondWithFileTool
@@ -12,3 +14,17 @@ TOOLS: list[BaseTool] = [
     StatFileTool(),
     ReadFileTool(),
 ]
+
+
+def build_tools(store: KVStore) -> list[BaseTool]:
+    return [
+        RespondTool(),
+        RespondWithFileTool(),
+        ListFilesTool(),
+        StatFileTool(),
+        ReadFileTool(),
+        KVSetTool(store=store),
+        KVGetTool(store=store),
+        KVListTool(store=store),
+        KVDeleteTool(store=store),
+    ]

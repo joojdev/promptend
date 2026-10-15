@@ -15,6 +15,7 @@ from src.api.errors import (
 from src.api.guards import RateLimiter, check_access_key, redact_headers
 from src.config.personality import resolve_personality
 from src.config.settings import load_settings
+from src.state.kv_store import KVStore
 
 log = structlog.get_logger()
 
@@ -37,7 +38,10 @@ def create_app(llm=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         global _agent
         source = resolve_personality(settings)
-        _agent = load_harness(str(source.path), llm=llm, personality_preset=source.preset)
+        store = KVStore(settings.kv_max_value_bytes, settings.kv_max_keys)
+        _agent = load_harness(
+            str(source.path), llm=llm, store=store, personality_preset=source.preset
+        )
         yield
         _agent = None
 

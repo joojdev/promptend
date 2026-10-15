@@ -37,7 +37,5 @@ def resolve_personality(settings, presets_dir: Path = PRESETS_DIR) -> Personalit
     if not available:
         _fail(f"no personality presets found in {presets_dir.as_posix()}/")
     if any(part in name for part in ("/", "\\", "..")) or name not in available:
-        _fail(
-            f"unknown personality preset '{name}'. Available presets: {', '.join(available)}"
-        )
+        _fail(f"unknown personality preset '{name}'. Available presets: {', '.join(available)}")
     return PersonalitySource(path=presets_dir / f"{name}.md", preset=name)
