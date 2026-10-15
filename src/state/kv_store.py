@@ -106,8 +106,18 @@ class KVStore:
 
     def set(self, key: str, value: JSONValue) -> dict:
         _check_key(key)
+        size = _value_size(value)
+        if size > self.max_value_bytes:
+            raise KVError(
+                f"value too large: {size} bytes exceeds KV_MAX_VALUE_BYTES ({self.max_value_bytes})"
+            )
         with self._lock:
             created = key not in self._data
+            if created and len(self._data) >= self.max_keys:
+                raise KVError(
+                    f"store full: KV_MAX_KEYS ({self.max_keys}) reached; "
+                    "delete keys or overwrite an existing one"
+                )
             previous = self._data.get(key)
             self._data[key] = value
 

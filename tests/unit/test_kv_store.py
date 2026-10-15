@@ -185,3 +185,40 @@ def test_over_limit_state_file_loads_with_warning(tmp_path, monkeypatch):
         store = _from_settings(tmp_path, monkeypatch, state_file=str(path), kv_max_keys=2)
     assert store.list()["keys"] == ["a", "b", "c"]
     assert any(e["event"] == "kv_state_over_limit" for e in logs)
+
+
+# US7 — limits
+
+
+def test_value_too_large_rejected():
+    from src.state.kv_store import KVError
+
+    store = _store(max_value_bytes=10)
+    message = r"value too large: 22 bytes exceeds KV_MAX_VALUE_BYTES \(10\)"
+    with pytest.raises(KVError, match=message):
+        store.set("k", "x" * 20)
+    assert store.list()["keys"] == []
+
+
+def test_value_size_is_compact_utf8_json():
+    from src.state.kv_store import KVError
+
+    store = _store(max_value_bytes=10)
+    assert store.set("k", "12345678")["ok"] is True  # 10 bytes with quotes
+    assert store.set("d", {"a": [1]})["ok"] is True  # {"a":[1]} = 9 bytes compact
+    with pytest.raises(KVError):
+        store.set("m", "ççççç")  # 5 two-byte chars + quotes = 12 bytes
+    assert store.get("k")["value"] == "12345678"
+
+
+def test_store_full_rejects_new_keys_only():
+    from src.state.kv_store import KVError
+
+    store = _store(max_keys=2)
+    store.set("a", 1)
+    store.set("b", 2)
+    with pytest.raises(KVError, match=r"store full: KV_MAX_KEYS \(2\) reached"):
+        store.set("c", 3)
+    assert store.set("a", 10) == {"ok": True, "key": "a", "created": False}
+    assert store.list()["keys"] == ["a", "b"]
+    assert store.get("a")["value"] == 10
