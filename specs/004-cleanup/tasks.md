@@ -129,12 +129,12 @@ description: "Task list for Cleanup"
 
 ### Tests for User Story 6 (write first, confirm FAIL where applicable)
 
-- [ ] T026 [P] [US6] Add to `tests/unit/test_token_store.py`: create 3 user tokens and 1 admin token, then read the DB file bytes (and any `-wal` file) and assert none of the 4 full tokens appears, while each `prefix` does; assert the table has exactly the columns in data-model.md (`PRAGMA table_info(tokens)`)
-- [ ] T027 [P] [US6] Add to `tests/unit/test_startup.py`: `Settings` has no field whose name contains `password` other than `admin_password_hash`; add to `tests/unit/test_repo_files.py` (new): `.gitignore` lists `data/`
+- [X] T026 [P] [US6] Add to `tests/unit/test_token_store.py`: create 3 user tokens and 1 admin token, then read the DB file bytes (and any `-wal` file) and assert none of the 4 full tokens appears, while each `prefix` does; assert the table has exactly the columns in data-model.md (`PRAGMA table_info(tokens)`)
+- [X] T027 [P] [US6] Add to `tests/unit/test_startup.py`: `Settings` has no field whose name contains `password` other than `admin_password_hash`; add to `tests/unit/test_repo_files.py` (new): `.gitignore` lists `data/`
 
 ### Implementation for User Story 6
 
-- [ ] T028 [US6] Fix anything T026–T027 expose (expected: nothing beyond Phase 2 / T003); if the WAL file holds plaintext, it cannot (only hashes are written) — document the result in the checkpoint
+- [X] T028 [US6] Fix anything T026–T027 expose (expected: nothing beyond Phase 2 / T003); if the WAL file holds plaintext, it cannot (only hashes are written) — document the result in the checkpoint
 
 **Checkpoint**: Storage audit passes.
 

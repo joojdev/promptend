@@ -138,3 +138,33 @@ def test_two_instances_share_file(tmp_path):
     assert two.authenticate(issued.token) is not None
     two.revoke_user_token(issued.id)
     assert one.authenticate(issued.token) is None
+
+
+def test_raw_storage_holds_no_full_token(store):
+    issued = [store.create_user_token(f"t{i}") for i in range(3)]
+    issued.append(store.issue_admin_token(ttl_minutes=60))
+    raw = b"".join(
+        p.read_bytes() for p in store.path.parent.iterdir() if p.name.startswith("tokens.db")
+    )
+    for item in issued:
+        assert item.token.encode() not in raw
+        assert item.prefix.encode() in raw
+
+
+def test_table_columns(store):
+    import sqlite3
+
+    store.create_user_token("a")
+    with sqlite3.connect(store.path) as conn:
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(tokens)")]
+    assert columns == [
+        "id",
+        "role",
+        "name",
+        "token_hash",
+        "prefix",
+        "created_at",
+        "last_used_at",
+        "expires_at",
+        "revoked",
+    ]
