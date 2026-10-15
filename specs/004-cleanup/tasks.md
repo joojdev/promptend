@@ -111,11 +111,11 @@ description: "Task list for Cleanup"
 
 ### Tests for User Story 3 (write first, confirm FAIL)
 
-- [ ] T024 [P] [US3] Add to `tests/integration/test_admin_http.py` (with `admin_env`, `enable_auth`): login, `POST /_admin/tokens {"name": "app"}` → 201 with `id, name, prefix, token (sk_…), created_at`; empty name → 422; `GET /_admin/tokens` → list containing that id with `revoked: false`, no `token`/`token_hash` keys, no admin rows; catch-all with the new `sk_` token → 200; `DELETE /_admin/tokens/{id}` → 204, again → 204; catch-all with it → 401; `DELETE /_admin/tokens/999` → 404; `DELETE /_admin/tokens/<admin token id>` → 404; token routes with no header, a user token, an unknown token, or an expired admin token (monkeypatch `_now`) → 401; `PUT /_admin/tokens` → 404 or 405; `llm.calls` only counts the catch-all requests
+- [X] T024 [P] [US3] Add to `tests/integration/test_admin_http.py` (with `admin_env`, `enable_auth`): login, `POST /_admin/tokens {"name": "app"}` → 201 with `id, name, prefix, token (sk_…), created_at`; empty name → 422; `GET /_admin/tokens` → list containing that id with `revoked: false`, no `token`/`token_hash` keys, no admin rows; catch-all with the new `sk_` token → 200; `DELETE /_admin/tokens/{id}` → 204, again → 204; catch-all with it → 401; `DELETE /_admin/tokens/999` → 404; `DELETE /_admin/tokens/<admin token id>` → 404; token routes with no header, a user token, an unknown token, or an expired admin token (monkeypatch `_now`) → 401; `PUT /_admin/tokens` → 404 or 405; `llm.calls` only counts the catch-all requests
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Add to `src/api/admin.py`: dependency `require_admin(request)` = `authenticate(header, store, auth_enabled=True)` must return a `Principal` with role `admin`, else `UnauthorizedError`; `CreateTokenRequest(name: str = Field(min_length=1))`; `POST /tokens` (201, `IssuedToken` fields), `GET /tokens` (`[r.to_public_dict() for r in store.list_user_tokens()]`), `DELETE /tokens/{token_id}` (`int` path param; 204 `Response`, or `NotFoundError`). Declare these routes before the `/{rest:path}` fallback
+- [X] T025 [US3] Add to `src/api/admin.py`: dependency `require_admin(request)` = `authenticate(header, store, auth_enabled=True)` must return a `Principal` with role `admin`, else `UnauthorizedError`; `CreateTokenRequest(name: str = Field(min_length=1))`; `POST /tokens` (201, `IssuedToken` fields), `GET /tokens` (`[r.to_public_dict() for r in store.list_user_tokens()]`), `DELETE /tokens/{token_id}` (`int` path param; 204 `Response`, or `NotFoundError`). Declare these routes before the `/{rest:path}` fallback
 
 **Checkpoint**: Full HTTP token lifecycle works; Part A MVP (US1–US3) complete.
 
