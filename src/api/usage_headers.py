@@ -28,13 +28,12 @@ def apply_usage(request: Request, response: Response, *, method: str, path: str)
     response.headers["X-Dopamine-Tokens-Out"] = str(usage.tokens_out)
     response.headers["X-Dopamine-Steps"] = str(usage.steps)
 
-    log.info(
-        "request",
-        method=method,
-        path=path,
-        status=response.status_code,
-        tokens_in=usage.tokens_in,
-        tokens_out=usage.tokens_out,
-        steps=usage.steps,
-    )
+    fields = {"tokens_in": usage.tokens_in, "tokens_out": usage.tokens_out, "steps": usage.steps}
+    price_in, price_out = getattr(request.app.state, "llm_prices", (None, None))
+    cost = usage.cost_usd(price_in, price_out)
+    if cost is not None:
+        response.headers["X-Dopamine-Cost-USD"] = cost
+        fields["cost_usd"] = cost
+
+    log.info("request", method=method, path=path, status=response.status_code, **fields)
     return response

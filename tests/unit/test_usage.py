@@ -45,3 +45,35 @@ def test_each_tool_call_is_a_step():
     tracker = UsageTracker()
     tracker.on_llm_end(_result(1, 1, tool_calls=2))
     assert tracker.steps == 2
+
+
+# US9 — cost
+
+
+def _tracker(tokens_in, tokens_out):
+    from src.agent.usage import UsageTracker
+
+    tracker = UsageTracker()
+    tracker.tokens_in, tracker.tokens_out = tokens_in, tokens_out
+    return tracker
+
+
+def test_cost_none_without_prices():
+    assert _tracker(250, 50).cost_usd(None, None) is None
+
+
+def test_cost_example():
+    assert _tracker(250, 50).cost_usd(3.0, 15.0) == "0.001500"
+
+
+def test_cost_zero_prices():
+    assert _tracker(250, 50).cost_usd(0, 0) == "0.000000"
+
+
+def test_cost_rounds_half_up():
+    assert _tracker(1, 0).cost_usd(0.5, 0) == "0.000001"
+    assert _tracker(1, 0).cost_usd(0.4, 0) == "0.000000"
+
+
+def test_cost_one_million_tokens():
+    assert _tracker(1_000_000, 0).cost_usd(3.0, 15.0) == "3.000000"

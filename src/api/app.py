@@ -48,6 +48,7 @@ def create_app(llm=None) -> FastAPI:
         _agent = None
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.llm_prices = (settings.llm_price_input_per_mtok, settings.llm_price_output_per_mtok)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
