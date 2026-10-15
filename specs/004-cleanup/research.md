@@ -34,7 +34,7 @@ Context checked against the repo at the start of planning: FastAPI 0.136 / Starl
 
 ### R6. Where auth runs and in what order
 
-- **Decision**: Catch-all order stays: body size (413) → **token auth (401)** → rate limit (429) → agent. Auth is a plain function `authenticate(request, store, settings) -> Principal | None` in `src/api/auth.py`, where `Principal(role: "admin" | "user", token_id: int)`. It parses `Authorization: Bearer <token>` (scheme case-insensitive, exactly one space-separated token, non-empty), looks the hash up, rejects revoked/expired, and on a user token updates `last_used_at`. With `AUTH_ENABLED=false`, a missing or invalid token yields the anonymous `user` principal and a valid admin token still yields `admin`.
+- **Decision**: Catch-all order stays: body size (413) → **token auth (401)** → rate limit (429) → agent. Auth is a plain function `authenticate(authorization_header, store, auth_enabled) -> Principal | None` in `src/api/auth.py`, where `Principal(role: "admin" | "user", token_id: int)`. It parses `Authorization: Bearer <token>` (scheme case-insensitive, exactly one space-separated token, non-empty), looks the hash up, rejects revoked/expired, and on a user token updates `last_used_at`. With `AUTH_ENABLED=false`, a missing or invalid token yields the anonymous `user` principal and a valid admin token still yields `admin`.
 - **Rationale**: Keeps the existing guard ordering (spec edge case) and one header for both roles (spec assumption).
 
 ### R7. Admin routes and the reserved prefix
