@@ -1,36 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.1.0 → 1.2.0
+Version change: 1.2.0 → 1.3.0
 
 Modified principles:
-  - I. Agent-as-Harness (title unchanged): added "Response metadata" paragraph.
-    Infrastructure MAY annotate agent-produced responses with run metadata
-    (003-cosmetic-features usage headers) but MUST NOT change status or body.
-  - II. Customizable Personality (title unchanged): presets are now allowed.
-    Shipped presets live in `config/personalities/`; `PERSONALITY` selects one,
-    `PERSONALITY_PATH` overrides with a custom file. The "MUST exist" rule now
-    applies to the resolved personality file. Removed "No pre-defined personality
-    presets".
+  - I. Agent-as-Harness (title unchanged): added "Control plane" paragraph.
+    Reserved `/_admin/` routes (admin login and token management, 004-cleanup)
+    MAY respond, including 2xx, without the agent. Added "Role-scoped tools":
+    the caller's role MAY select which registered tools an agent run is offered.
 
-Modified standards:
-  - Configuration & Standards: "No long-term memory" replaced. Conversation memory
-    stays out of scope (each request starts without history); explicit state
-    through bounded storage tools is allowed.
-
+Modified standards: None
 Added sections: None
 Removed sections: None
 
-Bump rationale: MINOR — rules relaxed in a backward-compatible way (a custom
-personality file still works and still fails startup when missing); no
-principle removed.
+Bump rationale: MINOR — new bounded exception to Principle I and new guidance
+on tool exposure; no principle removed or redefined incompatibly.
 
 Templates requiring updates:
   ✅ .specify/templates/plan-template.md — Constitution Check reads constitution at runtime
   ✅ .specify/templates/spec-template.md — no change needed
   ✅ .specify/templates/tasks-template.md — no change needed
-  ✅ specs/001-project-boilerplate/quickstart.md — personality section now describes presets
-    (updated by 003-cosmetic-features implementation)
 
 Deferred TODOs: None
 -->
@@ -70,6 +59,17 @@ Response metadata: infrastructure MAY add headers describing the agent run
 or failed to produce. It MUST NOT change the status code or body chosen by the
 agent, and system metadata headers take precedence over same-named headers the
 agent sets.
+
+Control plane: routes under the reserved `/_admin/` prefix (admin login and
+token management) MAY respond, including with 2xx, without invoking the agent.
+They MUST only authenticate callers and manage credentials, MUST NEVER invoke
+the agent, MUST NOT add behavior a tool could provide, and MUST be covered by
+tests proving the agent was not invoked.
+
+Role-scoped tools: each tool declares the caller role allowed to use it. The
+authenticated caller's role MAY select which registered tools an agent run is
+offered; tools outside that role MUST NOT be offered to the model at all.
+Declaring a tool's role MUST NOT require changes to routing or auth code.
 
 **Rationale**: The harness model keeps the agent as the single decision-maker
 and makes the system trivially extensible: drop in a new tool, the agent gains
@@ -169,4 +169,4 @@ Amendments require:
 3. Propagation check across all `.specify/templates/` files.
 4. Updated `LAST_AMENDED_DATE`.
 
-**Version**: 1.2.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15
+**Version**: 1.3.0 | **Ratified**: 2026-05-19 | **Last Amended**: 2026-10-15
