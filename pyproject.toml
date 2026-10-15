@@ -18,6 +18,9 @@ dependencies = [
     "argon2-cffi>=25.1",
 ]
 
+[project.scripts]
+tokens = "src.cli.tokens:main"
+
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.2"]
 bedrock = ["langchain-aws>=0.2"]

@@ -241,3 +241,21 @@ def test_unsupported_method_on_tokens(monkeypatch, env):
         r = c.put("/_admin/tokens", headers=_admin_headers(c))
     assert r.status_code in (404, 405)
     assert llm.calls == 0
+
+
+# --- US5: CLI and HTTP share one store ---
+
+
+def test_cli_and_http_share_tokens(monkeypatch, env, capsys):
+    from src.cli.tokens import main
+
+    admin_env(monkeypatch)
+    assert main(["--db", str(env), "create", "cli"]) == 0
+    capsys.readouterr()
+    with _client(_app(_llm())) as c:
+        adm = _admin_headers(c)
+        assert [t["name"] for t in c.get("/_admin/tokens", headers=adm).json()] == ["cli"]
+        assert c.post("/_admin/tokens", json={"name": "http"}, headers=adm).status_code == 201
+    assert main(["--db", str(env), "list"]) == 0
+    out = capsys.readouterr().out
+    assert "cli" in out and "http" in out
