@@ -7,13 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
+from src.agent.usage import UsageTracker
 from src.api.errors import (
     RateLimitedError,
     UnauthorizedError,
     register_error_handlers,
 )
 from src.api.guards import RateLimiter, check_access_key, redact_headers
+from src.api.usage_headers import USAGE_HEADERS, apply_usage
+from src.config.personality import resolve_personality
 from src.config.settings import load_settings
+from src.state.kv_store import KVStore
 
 log = structlog.get_logger()
 
@@ -35,16 +39,22 @@ def create_app(llm=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         global _agent
-        _agent = load_harness(settings.personality_path, llm=llm)
+        source = resolve_personality(settings)
+        store = KVStore.from_settings(settings)
+        _agent = load_harness(
+            str(source.path), llm=llm, store=store, personality_preset=source.preset
+        )
         yield
         _agent = None
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.llm_prices = (settings.llm_price_input_per_mtok, settings.llm_price_output_per_mtok)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=list(USAGE_HEADERS),
     )
     register_error_handlers(app)
     limiter = RateLimiter(settings.rate_limit_per_minute)
@@ -76,7 +86,9 @@ def create_app(llm=None) -> FastAPI:
             "query_params": dict(request.query_params),
         }
 
-        result = await invoke_agent(_agent, incoming, settings.agent_timeout_seconds)
+        usage = UsageTracker()
+        request.state.usage = usage
+        result = await invoke_agent(_agent, incoming, settings.agent_timeout_seconds, usage=usage)
         warning = result.pop("warning", None)
 
         status_code = result["status_code"]
@@ -86,19 +98,14 @@ def create_app(llm=None) -> FastAPI:
         body = result["body"]
         content_type = result["content_type"]
 
-        log.info(
-            "request",
-            method=request.method,
-            path=f"/{full_path}",
-            status=status_code,
-        )
-
         if isinstance(body, dict):
-            return JSONResponse(content=body, status_code=status_code, headers=headers)
-        raw_body = base64.b64decode(body) if result.get("_base64") else body
-        return Response(
-            content=raw_body, status_code=status_code, headers=headers, media_type=content_type
-        )
+            response = JSONResponse(content=body, status_code=status_code, headers=headers)
+        else:
+            raw_body = base64.b64decode(body) if result.get("_base64") else body
+            response = Response(
+                content=raw_body, status_code=status_code, headers=headers, media_type=content_type
+            )
+        return apply_usage(request, response, method=request.method, path=f"/{full_path}")
 
     return app
 

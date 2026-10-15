@@ -8,13 +8,15 @@ from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
-from src.agent.registry import TOOLS
+from src.agent.registry import build_tools
+from src.agent.usage import UsageTracker
 from src.api.errors import (
     AgentLoopLimitError,
     AgentNoResponseError,
     AgentTimeoutError,
     LLMUnavailableError,
 )
+from src.state.kv_store import KVStore
 
 log = structlog.get_logger()
 
@@ -61,6 +63,22 @@ Use `list_files` to discover available files before calling this tool.
 
 Choose `status_code` semantically: 200 for success, 201 for created, 400 for bad
 input, 404 for not found, 500 for unexpected errors.
+
+## Storage
+
+You have a key-value storage, accessed with `kv_set`, `kv_get`, `kv_list` and
+`kv_delete`.
+
+- Storage is shared across all requests and is your only memory between requests.
+- When a request creates, updates or deletes a resource, write the change with
+  `kv_set` / `kv_delete` before responding.
+- Before answering a read (GET), look the data up with `kv_get` / `kv_list`; do not
+  invent data that contradicts what is stored.
+- Use keys shaped `<collection>/<id>` (e.g. `users/42`) so `kv_list("users/")` lists
+  a collection.
+- `found: false` is a normal outcome (typically a 404), not an error.
+- If a storage call fails (value too large, store full), report it to the caller with
+  an appropriate status (e.g. 413, 507) — still via `respond`.
 
 ## Best Practices
 
@@ -161,7 +179,13 @@ def _build_llm_from_settings(settings) -> BaseChatModel:
 _verbose = False
 
 
-def load_harness(personality_path: str, llm: BaseChatModel | None = None):
+def load_harness(
+    personality_path: str,
+    llm: BaseChatModel | None = None,
+    store: KVStore | None = None,
+    *,
+    personality_preset: str | None = None,
+):
     global _verbose
 
     if not Path(personality_path).exists():
@@ -177,19 +201,27 @@ def load_harness(personality_path: str, llm: BaseChatModel | None = None):
     settings = load_settings()
     _verbose = settings.agent_verbose
 
+    if store is None:
+        store = KVStore(settings.kv_max_value_bytes, settings.kv_max_keys)
+
     log.info(
         "harness_startup",
         personality_loaded=personality_loaded,
         personality_path=personality_path,
+        personality_preset=personality_preset,
         verbose=_verbose,
+        state_file=str(store.state_file) if store.state_file else None,
+        kv_keys=len(store.list()["keys"]),
     )
+    if not personality_loaded:
+        log.warning("personality_empty", personality_path=personality_path)
 
     if llm is None:
         llm = _build_llm()
 
     agent = create_react_agent(
         llm,
-        TOOLS,
+        build_tools(store),
         prompt=SystemMessage(content=system_prompt),
         checkpointer=None,
     )
@@ -324,7 +356,9 @@ def _classify_messages(messages: list) -> dict:
     raise AgentNoResponseError()
 
 
-async def invoke_agent(agent, incoming: dict, timeout_seconds: float = 30) -> dict:
+async def invoke_agent(
+    agent, incoming: dict, timeout_seconds: float = 30, usage: UsageTracker | None = None
+) -> dict:
     message_text = (
         f"Method: {incoming['method']}\n"
         f"Path: {incoming['path']}\n"
@@ -332,11 +366,14 @@ async def invoke_agent(agent, incoming: dict, timeout_seconds: float = 30) -> di
         f"Headers: {incoming['headers']}\n"
         f"Body: {incoming['body']}"
     )
+    config = {"recursion_limit": 25}
+    if usage is not None:
+        config["callbacks"] = [usage]
     try:
         result = await asyncio.wait_for(
             agent.ainvoke(
                 {"messages": [{"role": "user", "content": message_text}]},
-                config={"recursion_limit": 25},
+                config=config,
             ),
             timeout=timeout_seconds,
         )

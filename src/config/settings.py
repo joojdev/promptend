@@ -16,13 +16,19 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     max_request_body_size: int = 1048576
-    personality_path: str = "config/personality.md"
+    personality: str = "default"
+    personality_path: str = ""
     agent_verbose: bool = False
     rate_limit_per_minute: int = 20
     dopamine_access_key: str = ""
     agent_timeout_seconds: float = 30
     sensitive_header_names: str = "authorization,proxy-authorization,cookie,set-cookie,x-api-key"
     sensitive_header_fragments: str = "token,secret,key"
+    state_file: str = ""
+    kv_max_value_bytes: int = 65536
+    kv_max_keys: int = 1000
+    llm_price_input_per_mtok: float | None = None
+    llm_price_output_per_mtok: float | None = None
 
     @field_validator("llm_model")
     @classmethod
@@ -51,12 +57,28 @@ class Settings(BaseSettings):
             raise ValueError("must be > 0")
         return v
 
-    @field_validator("rate_limit_per_minute", "agent_timeout_seconds")
+    @field_validator(
+        "rate_limit_per_minute", "agent_timeout_seconds", "kv_max_value_bytes", "kv_max_keys"
+    )
     @classmethod
     def must_be_positive(cls, v):
         if v <= 0:
             raise ValueError("must be > 0")
         return v
+
+    @model_validator(mode="after")
+    def prices_set_together(self) -> "Settings":
+        price_in = self.llm_price_input_per_mtok
+        price_out = self.llm_price_output_per_mtok
+        if (price_in is None) != (price_out is None):
+            raise ValueError(
+                "LLM_PRICE_INPUT_PER_MTOK and LLM_PRICE_OUTPUT_PER_MTOK must be set together"
+            )
+        if price_in is not None and price_in < 0:
+            raise ValueError("LLM_PRICE_INPUT_PER_MTOK must be >= 0")
+        if price_out is not None and price_out < 0:
+            raise ValueError("LLM_PRICE_OUTPUT_PER_MTOK must be >= 0")
+        return self
 
     @field_validator("dopamine_access_key")
     @classmethod
