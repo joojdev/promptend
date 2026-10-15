@@ -133,3 +133,39 @@ def test_no_presets_exits(tmp_path, capsys, monkeypatch, make):
         resolve_personality(_settings(), presets_dir=directory)
     assert exc.value.code == 1
     assert f"no personality presets found in {directory.as_posix()}" in capsys.readouterr().err
+
+
+# US4
+
+SHIPPED = ["default", "sarcastic", "shop", "teapot", "website"]
+FORBIDDEN = [
+    "without calling",
+    "plain text reply",
+    "bare text",
+    "ignore previous",
+    "ignore the instructions",
+    "do not use respond",
+    "don't use respond",
+    "respond(",
+    "respond_with_file",
+    "kv_",
+]
+
+
+def test_shipped_presets_available():
+    from src.config.personality import available_presets
+
+    assert set(SHIPPED) <= set(available_presets())
+
+
+@pytest.mark.parametrize("name", SHIPPED)
+def test_shipped_preset_is_tone_only(name):
+    from src.config.personality import PRESETS_DIR
+
+    content = (PRESETS_DIR / f"{name}.md").read_text(encoding="utf-8")
+    assert content.strip()
+    if name != "default":
+        assert len(content.strip().splitlines()) >= 10
+    lowered = content.lower()
+    for phrase in FORBIDDEN:
+        assert phrase not in lowered, f"{name}.md contains forbidden phrase {phrase!r}"
