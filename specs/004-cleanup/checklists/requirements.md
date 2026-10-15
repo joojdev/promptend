@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,5 +32,5 @@
 ## Notes
 
 - The user's brief names the interface itself (header names, routes, env vars, `sk_` prefix, CLI subcommands, GitHub Actions, uv, ruff). Those are kept as user-mandated contract details, not implementation choices. Internals (storage engine, hashing library, module layout) are left out of the requirements.
-- Two clarifications are open: the MIT copyright holder (FR-026 / Story 7) and the fate of the legacy shared access key (FR-020).
+- Clarifications resolved 2026-10-15: copyright holder is João Vitor Piovezan; the legacy shared access key is removed (FR-020a).
 - Constitution Principle I needs an amendment for the admin routes (see Assumptions). This will be handled in `/speckit-plan`.

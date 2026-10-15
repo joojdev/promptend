@@ -8,6 +8,13 @@
 
 **Input**: User description: "cleanup — three cards: (A) simple API-key authentication with an admin role (single ADMIN_KEY from .env, manages keys only) and a client role (keys created by the admin, the only ones allowed on the catch-all); keys stored hashed in a local database file (KEYS_DB_PATH, default data/keys.db), `sk_`-prefixed, shown once; admin routes under the reserved `/_admin/keys` prefix (create / list / revoke) authenticated by `Authorization: Bearer <ADMIN_KEY>`, 404 when ADMIN_KEY is unset; catch-all requires `X-API-Key`, 401 `{\"error\": \"unauthorized\"}` without invoking the agent; credentials stripped before the agent sees the request; AUTH_ENABLED (default true) to disable for local dev; an `apikeys` CLI (create / list [--all] / revoke) talking directly to the key store; shared key logic, no duplication; .env.example updated; no use of the current project name in anything the card creates. (B) CI with ruff check, ruff format --check and pytest on Python 3.11 and 3.12 using uv; fix ruff findings; .gitattributes marking .specify/ and .claude/ as vendored and specs/ as documentation; keep .specify/ and specs/; MIT LICENSE (ask for the copyright name first). (C) A funny but technically honest English README built only from what exists in the code, with title + tagline + badges, demo placeholder, what/how (Mermaid flow + tools), quickstart (≤3 uv commands + provider choice), configuration table from the real settings, personalities, 'Why you should never use this in production' (latency, cost, non-determinism, prompt injection, third-party data flow, hallucinated status codes, each with the existing mitigation), how it was built (Spec Kit, specs/), contributing and license; TODO placeholders for real LLM output."
 
+## Clarifications
+
+### Session 2026-10-15
+
+- Q: Which name goes on the MIT copyright line? → A: "João Vitor Piovezan".
+- Q: What happens to the existing shared access key (`DOPAMINE_ACCESS_KEY` / `X-Dopamine-Key`)? → A: Remove it and let client API keys replace it (recommended for one auth path, per-client revocation and audit, and no project name in auth).
+
 ## User Scenarios & Testing *(mandatory)*
 
 The feature has three independent parts. Each can be built, tested and shipped on its own.
@@ -133,7 +140,7 @@ A visitor to the GitHub page should see a language bar that reflects the real co
 
 1. **Given** the repository attributes file, **When** GitHub computes languages, **Then** `.specify/` and `.claude/` count as vendored and `specs/` as documentation.
 2. **Given** this feature is merged, **When** the tree is listed, **Then** `.specify/` and `specs/` are still present.
-3. **Given** the LICENSE file, **When** read, **Then** it is the MIT license with year 2026 and copyright holder [NEEDS CLARIFICATION: Which name should appear in the MIT copyright line? The user asked to be asked before the file is created.].
+3. **Given** the LICENSE file, **When** read, **Then** it is the MIT license with year 2026 and copyright holder "João Vitor Piovezan".
 
 ---
 
@@ -195,7 +202,8 @@ A visitor lands on the repository and, within a couple of minutes, understands w
 - **FR-017**: A command-line tool, runnable as a module and as an installed command named `apikeys`, MUST offer `create <name>` (prints the full key once with a "won't be shown again" warning), `list` (table of id, name, prefix, created at, last used, status; `--all` includes revoked keys) and `revoke <id>`. It MUST operate directly on the configured key store, MUST work with the server stopped, and MUST NOT need the admin key. It MUST NOT add new runtime dependencies.
 - **FR-018**: Key generation, hashing, storage, lookup, listing and revocation MUST be implemented once in a shared module used by both the HTTP routes and the CLI.
 - **FR-019**: `.env.example` MUST document `ADMIN_KEY`, `KEYS_DB_PATH` and `AUTH_ENABLED`, including a comment showing how to generate an admin key (`python -c "import secrets; print(secrets.token_urlsafe(32))"`).
-- **FR-020**: No route, setting, key prefix, CLI command, module or file created or modified by Part A may contain the project's current name (case-insensitive). The pre-existing shared access key setting and header (`DOPAMINE_ACCESS_KEY` / `X-Dopamine-Key`) carry the name. Their fate is [NEEDS CLARIFICATION: Should the new client-key auth replace the existing single shared access key (remove setting, header and its tests), or should both mechanisms coexist?]. The existing usage headers (`X-Dopamine-Tokens-*`, etc.) are out of scope and unchanged.
+- **FR-020**: No route, setting, key prefix, CLI command, module or file created or modified by Part A may contain the project's current name (case-insensitive). The existing usage headers (`X-Dopamine-Tokens-*`, etc.) are out of scope and unchanged.
+- **FR-020a**: The existing single shared access key (`DOPAMINE_ACCESS_KEY` setting and `X-Dopamine-Key` header) MUST be removed: its setting, its check on the catch-all, its special case in header handling, its `.env.example` entry and its tests. Client API keys are the only way to call the catch-all. A request that still sends `X-Dopamine-Key` gets no special treatment. Without a valid `X-API-Key` it gets 401, and the header is handled by the normal redaction rules.
 - **FR-021**: Existing tests that call the catch-all MUST be updated to pass with authentication on by default, through a shared test fixture that either provisions a client key or disables authentication.
 
 **Part B — CI and repository hygiene**
@@ -241,6 +249,7 @@ A visitor lands on the repository and, within a couple of minutes, understands w
 - Admin routes return successful responses without the agent. This needs a constitution amendment: Principle I currently allows agent-bypassing guards only for rejections. The plan phase will propose that amendment (key management as a reserved, non-agent control plane, like `/health`).
 - The current lint/format findings all sit in the vendored Spec Kit scripts under `.specify/`. "Fix what ruff reports" is satisfied by excluding the vendored directories from ruff (consistent with marking them vendored) rather than editing third-party scaffolding. Project code is already clean.
 - The existing redaction of other sensitive headers (masking with `[REDACTED]`) stays as is. Only `X-API-Key` and `Authorization` change from masked to removed.
+- Removing the shared access key is a breaking change for anyone with `DOPAMINE_ACCESS_KEY` in their `.env`. Since the project is pre-1.0 and has no known deployments, it is accepted with no migration shim.
 - The existing per-client rate limit, body-size limit and agent timeout are unchanged. Client-key auth is checked before the rate limit so that unauthenticated traffic does not consume rate-limit budget.
 - Timestamps are stored and shown in UTC ISO-8601.
 - Key ids are short, auto-incrementing integers, which are easy to type in the CLI.
