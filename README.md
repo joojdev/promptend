@@ -1,165 +1,176 @@
 # Promptend
 
-**An HTTP server with no routes. An LLM reads every request and decides what to answer.**
+**A backend with no code in it. Every request is answered by an LLM that has never seen your API spec, because there isn't one.**
 
-[![CI](https://github.com/joojdev/dopamine/actions/workflows/ci.yml/badge.svg)](https://github.com/joojdev/dopamine/actions/workflows/ci.yml)
+[![CI](https://github.com/joojdev/promptend/actions/workflows/ci.yml/badge.svg)](https://github.com/joojdev/promptend/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<!-- TODO: demo GIF (record a terminal session of the curl calls below) -->
+> [!WARNING]
+> This is a bad idea. It is slow, it is expensive, it gives different answers to the same
+> question, and anyone who can write a request body can try to talk it into things. It was
+> built on purpose, with tests, by someone who knows all of that. Please do not put it in
+> front of anything you care about.
 
-```bash
-curl -i http://localhost:8000/api/products?color=purple \
-     -H "Authorization: Bearer $TOKEN"
+```console
+$ curl -i -X DELETE localhost:8000/api/free-will -H "Authorization: Bearer $TOKEN"
+
+HTTP/1.1 409 Conflict
+content-type: application/json
+x-promptend-tokens-in: 2841
+x-promptend-tokens-out: 97
+x-promptend-steps: 1
+x-promptend-cost-usd: 0.009978
+
+{
+  "error": "cannot_delete_free_will",
+  "message": "You chose to send this request. If I delete free will, that choice was never
+              yours, so the request was never really sent, so there is nothing to delete.
+              Resource left in place. Please choose again (if you can)."
+}
 ```
 
-<!-- TODO: paste the real response of the command above, started with PERSONALITY=shop -->
+*Example output. Yours will differ, which is sort of the whole problem.*
 
 ## What is this?
 
-A FastAPI app with exactly one real route: a catch-all. Every method on every path goes to
-an LLM agent, which reads the method, path, query, headers and body, picks a status code,
-and writes the response itself. It has a key-value store to remember things between
-requests, so a `POST` can be followed by a `GET` that finds what was posted, most of the time.
+A web server with exactly one route, and that route forwards everything to an AI. It reads
+the method, the path, the headers and the body, decides what you probably meant, invents a
+status code, and writes the response. There are no controllers, no models, no database
+schema, no product manager. There is a vibe, and the vibe has a system prompt.
+
+It even remembers things: a `POST /users` is usually followed by a `GET /users` that finds
+the user. Usually.
+
+## More things it will happily do
+
+All examples are illustrative. Run them yourself for a fresh, unrepeatable experience.
+
+**Ask a metaphysical question** (`PERSONALITY=default`)
+
+```console
+$ curl -s localhost:8000/api/meaning-of-life
+{"meaning": 42, "unit": null, "note": "The unit was lost in a migration. We are looking into it."}
+```
+
+**Buy something nobody needs** (`PERSONALITY=shop`)
+
+```console
+$ curl -s -X POST localhost:8000/cart -d '{"product": "bottled-tuesday-air", "qty": 3}'
+{"cart_id": "c_7731", "items": [{"product": "bottled-tuesday-air", "qty": 3, "unit_price": 19.99}],
+ "total": 59.97, "warning": "Do not open on a Monday."}
+
+$ curl -s localhost:8000/cart/c_7731      # it remembers the cart
+```
+
+**Get the right answer, with feelings** (`PERSONALITY=sarcastic`)
+
+```console
+$ curl -s localhost:8000/users/42
+{"id": 42, "name": "Ana", "message": "Here is user 42. Again. It hasn't changed since the last five times."}
+```
+
+**Order coffee from a teapot** (`PERSONALITY=teapot`)
+
+```console
+$ curl -si -X POST localhost:8000/coffee
+HTTP/1.1 418 I'm a Teapot
+
+{"error": "i_am_a_teapot", "reason": "To brew coffee I would have to stop being a teapot.
+A teapot that stops being a teapot was never a teapot. I decline to have never existed."}
+```
+
+**Browse a website that does not exist** (`PERSONALITY=website`)
+
+```console
+$ curl -s localhost:8000/about
+<!doctype html><html><head><title>About Us · Gerald's Wizard School</title>…
+```
+
+Every response tells you what it cost (`x-promptend-tokens-in`, `-tokens-out`, `-steps`, and
+`-cost-usd` if you configure prices), so you can watch the money leave in real time.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A[HTTP request] --> B[catch-all route]
-    B --> C{body size, bearer token, rate limit}
-    C -- rejected --> X[413 / 401 / 429, agent never called]
-    C -- ok --> D[LLM agent]
-    D <--> E[tools]
-    E --> F[respond / respond_with_file]
-    F --> G[HTTP response]
+    A[Your request] --> B{Token? Size? Rate limit?}
+    B -- no --> X[401 / 413 / 429]
+    B -- yes --> C[LLM agent]
+    C <--> D[tools: storage, files]
+    C --> E[respond]
+    E --> F[Whatever it decided]
 ```
 
-Before the agent runs, the request goes through the body-size limit, bearer-token check and
-per-client rate limit, in that order. `Authorization` and `X-API-Key` are removed from what the
-agent sees; other sensitive headers are replaced with `[REDACTED]`. The agent loops over its
-tools until it calls one of the two respond tools (or runs out of steps or time).
-
-Tools the agent can use (all available to both roles today):
-
-| Tool | What it does |
-|------|--------------|
-| `respond` | Sends the final response: body, status code, headers, content type |
-| `respond_with_file` | Sends a file from the `files/` sandbox |
-| `list_files` | Lists the `files/` sandbox as a tree |
-| `stat_file` | Path, line count and size of a file in `files/` |
-| `read_file` | Reads a slice of a file in `files/` |
-| `kv_set` / `kv_get` / `kv_list` / `kv_delete` | Key-value storage shared across requests |
-
-Tools can be restricted to admin callers by declaring `role: str = "admin"` on the tool class
-and adding it to `build_tools()` in `src/agent/registry.py`. Requests made with an admin token
-get every tool; requests made with a user token get only user tools.
-
-Every response produced by the agent carries `X-Promptend-Tokens-In`, `X-Promptend-Tokens-Out`
-and `X-Promptend-Steps`, plus `X-Promptend-Cost-USD` when prices are configured. If the agent
-answered without calling a respond tool, `X-Promptend-Warning` says so.
+Before the AI sees anything, the request has to carry a valid token, fit under the size
+limit and respect the rate limit. Credential headers are stripped first, so your secrets
+don't get sent to the LLM provider. The agent then uses a few tools (key-value storage, a
+small file sandbox) and ends by calling `respond`, which becomes your HTTP response.
 
 ## Quickstart
 
 ```bash
-uv sync                                  # add --extra openai or --extra bedrock for those providers
-cp .env.example .env                     # set LLM_MODEL, LLM_API_KEY and LLM_PROVIDER
+uv sync
+cp .env.example .env        # pick a provider, model and API key; everything is explained in there
 uv run uvicorn src.api.app:app
 ```
 
-The catch-all requires a token. To get one:
+Then get yourself a token:
 
 ```bash
-uv run tokens hash-password              # put the output in .env as ADMIN_PASSWORD_HASH,
-                                         # and set ADMIN_USERNAME, then restart the server
-curl -s -X POST localhost:8000/_admin/login -H 'content-type: application/json' \
-     -d '{"username": "admin", "password": "<your password>"}'     # -> {"token": "adm_…", …}
-curl -s -X POST localhost:8000/_admin/tokens -H "Authorization: Bearer $ADMIN_TOKEN" \
-     -H 'content-type: application/json' -d '{"name": "laptop"}'   # -> {"token": "sk_…", …}
+uv run tokens create me     # prints an sk_… token once; send it as "Authorization: Bearer sk_…"
 ```
 
-Or skip the server entirely: `uv run tokens create laptop`. Tokens are listed with
-`uv run tokens list` (or `GET /_admin/tokens`) and revoked with `uv run tokens revoke <id>`
-(or `DELETE /_admin/tokens/<id>`). The full token is shown once; only its SHA-256 hash is
-stored. For local experiments, `AUTH_ENABLED=false` lets requests through without a token.
-
-## Configuration
-
-All settings come from environment variables or `.env`.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LLM_PROVIDER` | `anthropic` | `anthropic`, `openai` or `bedrock` |
-| `LLM_MODEL` | *(required)* | Model identifier for the provider |
-| `LLM_API_KEY` | *(empty)* | Required for `anthropic` and `openai` |
-| `AWS_PROFILE` | *(empty)* | Bedrock only: AWS profile to use |
-| `AWS_REGION` | *(empty)* | Bedrock only: AWS region |
-| `HOST` | `0.0.0.0` | Declared but not read by `uvicorn src.api.app:app`; pass `--host` to uvicorn |
-| `PORT` | `8000` | Declared but not read by `uvicorn src.api.app:app`; pass `--port` to uvicorn |
-| `MAX_REQUEST_BODY_SIZE` | `1048576` | Bytes; larger bodies get 413 before the agent runs |
-| `PERSONALITY` | `default` | Preset name from `config/personalities/` |
-| `PERSONALITY_PATH` | *(empty)* | Custom personality file; wins over `PERSONALITY` |
-| `AGENT_VERBOSE` | `false` | Log every agent step |
-| `RATE_LIMIT_PER_MINUTE` | `20` | Per-client requests per minute on the catch-all (429 beyond) |
-| `AGENT_TIMEOUT_SECONDS` | `30` | Seconds before the agent is abandoned (504) |
-| `SENSITIVE_HEADER_NAMES` | `authorization,proxy-authorization,cookie,set-cookie,x-api-key` | Header values replaced with `[REDACTED]` for the agent |
-| `SENSITIVE_HEADER_FRAGMENTS` | `token,secret,key` | Any header whose name contains one of these is redacted too |
-| `STATE_FILE` | *(empty)* | JSON file for the key-value store; empty = in memory |
-| `KV_MAX_VALUE_BYTES` | `65536` | Max size of one stored value |
-| `KV_MAX_KEYS` | `1000` | Max number of stored keys |
-| `LLM_PRICE_INPUT_PER_MTOK` | *(unset)* | USD per million input tokens; set both prices to get `X-Promptend-Cost-USD` |
-| `LLM_PRICE_OUTPUT_PER_MTOK` | *(unset)* | USD per million output tokens |
-| `ADMIN_USERNAME` | *(empty)* | Admin login name; `/_admin/` answers 404 while unset |
-| `ADMIN_PASSWORD_HASH` | *(empty)* | argon2 hash from `uv run tokens hash-password`, never the plain password |
-| `ADMIN_TOKEN_TTL_MINUTES` | `60` | Lifetime of admin tokens issued by login |
-| `LOGIN_RATE_LIMIT_PER_MINUTE` | `5` | Per-client login attempts per minute |
-| `TOKENS_DB_PATH` | `data/tokens.db` | SQLite file with token hashes (`data/` is git-ignored) |
-| `AUTH_ENABLED` | `true` | `false` lets token-less requests through as a user; local development only |
+There is also an admin login (`POST /_admin/login`) for managing tokens over HTTP, and a way
+to give some tools to admins only. `.env.example` explains how to set the admin password.
 
 ## Personalities
 
-The personality is the system prompt's opening act. Pick one with `PERSONALITY=<name>`:
+The personality decides what kind of backend you are pretending to have. Set
+`PERSONALITY=<name>`:
 
-- `default`: a helpful assistant. The control group.
-- `shop`: the backend of Acme Absurdities, selling bottled Tuesday air and left-handed spoons.
-- `sarcastic`: a deeply tired API. The JSON is correct; the sighing is extra.
-- `website`: an imaginary website that picks its theme from the first path it sees, then
-  serves full HTML pages for it.
-- `teapot`: answers 418 to everything, as RFC 2324 intended.
+- `default`: a helpful, neutral API. The control group.
+- `shop`: Acme Absurdities, selling bottled Tuesday air and left-handed spoons. Has stock, prices and opinions.
+- `sarcastic`: always correct, never happy about it.
+- `website`: picks a theme from the first path it sees and serves full HTML pages for it.
+- `teapot`: answers 418 to everything and can explain why at length.
 
-To add one, drop a Markdown file in `config/personalities/` and use its file name (without
-`.md`) as `PERSONALITY`, or point `PERSONALITY_PATH` at a file anywhere.
-
-<!-- TODO: paste one real response per preset, e.g. `curl -s localhost:8000/ -H "Authorization: Bearer $TOKEN"` -->
+Want your own? Drop a Markdown file in `config/personalities/` and use its name.
 
 ## Why you should never use this in production
 
-| Risk | What it means here | Mitigation in this project |
-|------|--------------------|----------------------------|
-| Latency | Every request is at least one LLM round trip, usually several tool steps | `AGENT_TIMEOUT_SECONDS` returns 504 instead of waiting forever. Nothing makes it fast |
-| Cost per request | Every request spends tokens, including ones from strangers | Bearer tokens (admin login + user tokens), per-client rate limit, body-size limit, usage and cost headers on every response |
-| Non-determinism | The same `GET` can answer differently twice | None. The key-value store and prompt instructions make it more consistent, not consistent |
-| Prompt injection via the body | The request body is model input; a body can ask the agent to misbehave | Partial: admin-only tools are never offered to user-token requests, and the file tools are confined to `files/`. Nothing stops the model from following instructions in the body |
-| Request data sent to a third party | Paths, query strings, headers and bodies go to your LLM provider | `Authorization` and `X-API-Key` are removed; other sensitive headers are replaced with `[REDACTED]`. Everything else is sent |
-| Hallucinated status codes | The model picks the status code, and may pick a creative one | None. The prompt asks for semantic codes; the model decides |
+- **It's slow.** Every request is at least one LLM round trip, often several. There is a
+  timeout so it fails in 30 seconds instead of never. That's the only speed feature.
+- **It costs money per request.** Including the requests from bots scanning for
+  `/wp-admin`. Tokens, rate limits and a body-size cap keep strangers out; the cost headers
+  let you watch the rest.
+- **It's non-deterministic.** The same `GET` can answer differently twice. Shared storage
+  makes it more consistent, not consistent.
+- **Prompt injection is a feature request away.** The body is literally model input. Admin
+  tools are never offered to normal users and file access is sandboxed, but nothing stops
+  the model from being persuaded by a sufficiently moving JSON payload.
+- **Your data goes to a third party.** Paths, query strings and bodies are sent to your LLM
+  provider. Credential headers are removed and other sensitive ones are masked; the rest
+  travels.
+- **Status codes are vibes.** The model picks them. Usually sensibly. Once it returned a 409
+  for deleting free will, and honestly it had a point.
 
 ## How it was built
 
-With spec-driven development using [Spec Kit](https://github.com/github/spec-kit): each feature
-started as a specification, then a plan, then a task list, then code written test-first. All of
-it is in [`specs/`](specs/), including the arguments the project had with itself.
+With spec-driven development using [Spec Kit](https://github.com/github/spec-kit): every
+feature started as a spec, then a plan, then tasks, then test-first code. It's all in
+[`specs/`](specs/), which makes this the most thoroughly documented bad idea you will see
+today.
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a PR:
+Issues and pull requests are welcome, especially new personalities.
 
 ```bash
 uv sync --extra dev
 uv run ruff check . && uv run ruff format --check .
-uv run pytest
+uv run pytest               # fake LLMs only, no API key needed
 ```
-
-CI runs the same checks on Python 3.11 and 3.12. Tests use fake LLMs; no API key is needed.
 
 ## License
 
