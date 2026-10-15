@@ -209,6 +209,7 @@ def load_harness(
         personality_path=personality_path,
         personality_preset=personality_preset,
         verbose=_verbose,
+        state_file=str(store.state_file) if store.state_file else None,
         kv_keys=len(store.list()["keys"]),
     )
     if not personality_loaded:

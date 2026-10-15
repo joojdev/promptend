@@ -38,7 +38,7 @@ def create_app(llm=None) -> FastAPI:
     async def lifespan(app: FastAPI):
         global _agent
         source = resolve_personality(settings)
-        store = KVStore(settings.kv_max_value_bytes, settings.kv_max_keys)
+        store = KVStore.from_settings(settings)
         _agent = load_harness(
             str(source.path), llm=llm, store=store, personality_preset=source.preset
         )
