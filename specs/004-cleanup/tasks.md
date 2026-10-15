@@ -246,11 +246,11 @@ description: "Task list for Cleanup"
 
 ## Phase 13: Polish & Cross-Cutting Concerns
 
-- [ ] T052 [P] Grep Part A artifacts for the project name: `grep -rin dopamine src/auth src/cli src/api/admin.py src/api/auth.py src/agent/roles.py` must return nothing; check the diff of modified Part A files adds no new occurrence (SC-006)
-- [ ] T053 [P] Update `specs/003-cosmetic-features/quickstart.md` and `specs/001-project-boilerplate/quickstart.md` only where they tell users to set `DOPAMINE_ACCESS_KEY` (replace with token instructions)
-- [ ] T054 Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`; fix failures
-- [ ] T055 Run the automated part of `specs/004-cleanup/quickstart.md`; mark completed tasks `[X]` in this file
-- [ ] T056 Manual smoke with a real LLM only if `LLM_API_KEY` is available (one short pass): hash-password → login → create token → one catch-all request; record results; list the README TODO commands for the user
+- [X] T052 [P] Grep Part A artifacts for the project name: `grep -rin dopamine src/auth src/cli src/api/admin.py src/api/auth.py src/agent/roles.py` must return nothing; check the diff of modified Part A files adds no new occurrence (SC-006)
+- [X] T053 [P] Update `specs/003-cosmetic-features/quickstart.md` and `specs/001-project-boilerplate/quickstart.md` only where they tell users to set `DOPAMINE_ACCESS_KEY` (replace with token instructions)
+- [X] T054 Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pytest`; fix failures
+- [X] T055 Run the automated part of `specs/004-cleanup/quickstart.md`; mark completed tasks `[X]` in this file
+- [X] T056 Manual smoke with a real LLM only if `LLM_API_KEY` is available (one short pass): hash-password → login → create token → one catch-all request; record results; list the README TODO commands for the user
 
 ---
 
