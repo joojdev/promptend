@@ -58,3 +58,14 @@ def test_separate_apps_do_not_share_memory(env):
     with _client(llm) as client:
         assert client.get("/users/1").status_code == 200
     assert '"found": false' in llm.prompts[-1]
+
+
+def test_state_file_survives_new_app(env, tmp_path):
+    env.setenv("STATE_FILE", str(tmp_path / "state.json"))
+    with _client(make_queued_llm(*_write_steps())) as client:
+        assert client.post("/users").status_code == 201
+
+    llm = make_queued_llm(*_read_steps())
+    with _client(llm) as client:
+        assert client.get("/users/1").status_code == 200
+    assert '"name": "Ana"' in llm.prompts[-1]
