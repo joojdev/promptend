@@ -1,4 +1,5 @@
 import base64
+import sys
 from contextlib import asynccontextmanager
 
 import structlog
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse, Response
 
 from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
 from src.agent.usage import UsageTracker
+from src.api.admin import build_admin_router
 from src.api.auth import authenticate
 from src.api.errors import (
     RateLimitedError,
@@ -16,6 +18,7 @@ from src.api.errors import (
 )
 from src.api.guards import RateLimiter, redact_headers
 from src.api.usage_headers import USAGE_HEADERS, apply_usage
+from src.auth.passwords import InvalidAdminHash, validate_hash
 from src.auth.tokens import TokenStore
 from src.config.personality import resolve_personality
 from src.config.settings import load_settings
@@ -30,6 +33,12 @@ def create_app(llm=None) -> FastAPI:
     settings = load_settings()
     if llm is None:
         ensure_provider_installed(settings)
+    if settings.admin_password_hash:
+        try:
+            validate_hash(settings.admin_password_hash)
+        except InvalidAdminHash as exc:
+            print(f"Configuration error: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     structlog.configure(
         processors=[
@@ -41,6 +50,8 @@ def create_app(llm=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         global _agent
+        if not settings.admin_enabled:
+            log.warning("admin_routes_disabled")
         source = resolve_personality(settings)
         store = KVStore.from_settings(settings)
         _agent = load_harness(
@@ -61,6 +72,7 @@ def create_app(llm=None) -> FastAPI:
     register_error_handlers(app)
     limiter = RateLimiter(settings.rate_limit_per_minute)
     token_store = TokenStore(settings.tokens_db_path)
+    app.include_router(build_admin_router(token_store, settings))
 
     @app.get("/health")
     async def health():

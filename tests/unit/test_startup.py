@@ -231,3 +231,23 @@ def test_admin_enabled_needs_both_fields(monkeypatch, fields):
     for name in _AUTH_ENV:
         monkeypatch.delenv(name, raising=False)
     assert _settings(**fields).admin_enabled is False
+
+
+def test_invalid_admin_hash_exits_without_echo(monkeypatch, capsys, tmp_path):
+    from tests.conftest import make_queued_llm
+
+    persona = tmp_path / "persona.md"
+    persona.write_text("x")
+    monkeypatch.setenv("LLM_API_KEY", "k")
+    monkeypatch.setenv("LLM_MODEL", "m")
+    monkeypatch.setenv("PERSONALITY_PATH", str(persona))
+    monkeypatch.setenv("ADMIN_USERNAME", "admin")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "not-a-hash")
+    from src.api.app import create_app
+
+    with pytest.raises(SystemExit) as exc:
+        create_app(llm=make_queued_llm())
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "ADMIN_PASSWORD_HASH is not a valid argon2 hash" in err
+    assert "not-a-hash" not in err
