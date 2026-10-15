@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     max_request_body_size: int = 1048576
     personality_path: str = "config/personality.md"
     agent_verbose: bool = False
+    rate_limit_per_minute: int = 20
+    dopamine_access_key: str = ""
+    agent_timeout_seconds: float = 30
+    sensitive_header_names: str = "authorization,proxy-authorization,cookie,set-cookie,x-api-key"
+    sensitive_header_fragments: str = "token,secret,key"
 
     @field_validator("llm_model")
     @classmethod
@@ -45,6 +50,28 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError("must be > 0")
         return v
+
+    @field_validator("rate_limit_per_minute", "agent_timeout_seconds")
+    @classmethod
+    def must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError("must be > 0")
+        return v
+
+    @field_validator("dopamine_access_key")
+    @classmethod
+    def strip_access_key(cls, v: str) -> str:
+        return v.strip()
+
+    @property
+    def sensitive_header_rule(self) -> tuple[frozenset[str], tuple[str, ...]]:
+        def split(raw: str) -> list[str]:
+            return [item.strip().lower() for item in raw.split(",") if item.strip()]
+
+        return (
+            frozenset(split(self.sensitive_header_names)),
+            tuple(split(self.sensitive_header_fragments)),
+        )
 
 
 def load_settings() -> Settings:

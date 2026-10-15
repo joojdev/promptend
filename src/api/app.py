@@ -6,8 +6,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
-from src.agent.harness import invoke_agent, load_harness
-from src.api.errors import LLMUnavailableError, register_error_handlers
+from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
+from src.api.errors import (
+    RateLimitedError,
+    UnauthorizedError,
+    register_error_handlers,
+)
+from src.api.guards import RateLimiter, check_access_key, redact_headers
 from src.config.settings import load_settings
 
 log = structlog.get_logger()
@@ -17,6 +22,8 @@ _agent = None
 
 def create_app(llm=None) -> FastAPI:
     settings = load_settings()
+    if llm is None:
+        ensure_provider_installed(settings)
 
     structlog.configure(
         processors=[
@@ -40,6 +47,7 @@ def create_app(llm=None) -> FastAPI:
         allow_headers=["*"],
     )
     register_error_handlers(app)
+    limiter = RateLimiter(settings.rate_limit_per_minute)
 
     @app.get("/health")
     async def health():
@@ -53,23 +61,28 @@ def create_app(llm=None) -> FastAPI:
         if len(body) > settings.max_request_body_size:
             raise HTTPException(status_code=413)
 
+        if not check_access_key(
+            request.headers.get("x-dopamine-key"), settings.dopamine_access_key
+        ):
+            raise UnauthorizedError()
+        if not limiter.check(request.client.host if request.client else "unknown"):
+            raise RateLimitedError()
+
         incoming = {
             "method": request.method,
             "path": f"/{full_path}",
-            "headers": dict(request.headers),
+            "headers": redact_headers(request.headers, *settings.sensitive_header_rule),
             "body": body.decode(errors="replace"),
             "query_params": dict(request.query_params),
         }
 
-        try:
-            result = await invoke_agent(_agent, incoming)
-        except LLMUnavailableError:
-            raise
-        except Exception:
-            raise
+        result = await invoke_agent(_agent, incoming, settings.agent_timeout_seconds)
+        warning = result.pop("warning", None)
 
         status_code = result["status_code"]
-        headers = result["headers"] or {}
+        headers = dict(result["headers"] or {})
+        if warning:
+            headers["X-Dopamine-Warning"] = warning
         body = result["body"]
         content_type = result["content_type"]
 

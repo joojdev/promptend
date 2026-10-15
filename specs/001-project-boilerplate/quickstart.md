@@ -29,6 +29,9 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+The default provider (`anthropic`) is included. For other providers install the matching extra:
+`pip install -e ".[openai]"` or `".[bedrock]"` (`uv sync --extra openai` / `--extra bedrock`).
+
 ### 4. Configure environment variables
 
 Copy the example file and fill in your values:
