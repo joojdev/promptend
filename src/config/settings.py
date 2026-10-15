@@ -20,7 +20,6 @@ class Settings(BaseSettings):
     personality_path: str = ""
     agent_verbose: bool = False
     rate_limit_per_minute: int = 20
-    dopamine_access_key: str = ""
     agent_timeout_seconds: float = 30
     sensitive_header_names: str = "authorization,proxy-authorization,cookie,set-cookie,x-api-key"
     sensitive_header_fragments: str = "token,secret,key"
@@ -90,11 +89,6 @@ class Settings(BaseSettings):
         if price_out is not None and price_out < 0:
             raise ValueError("LLM_PRICE_OUTPUT_PER_MTOK must be >= 0")
         return self
-
-    @field_validator("dopamine_access_key")
-    @classmethod
-    def strip_access_key(cls, v: str) -> str:
-        return v.strip()
 
     @field_validator("admin_username", "admin_password_hash")
     @classmethod

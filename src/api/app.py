@@ -8,13 +8,15 @@ from fastapi.responses import JSONResponse, Response
 
 from src.agent.harness import ensure_provider_installed, invoke_agent, load_harness
 from src.agent.usage import UsageTracker
+from src.api.auth import authenticate
 from src.api.errors import (
     RateLimitedError,
     UnauthorizedError,
     register_error_handlers,
 )
-from src.api.guards import RateLimiter, check_access_key, redact_headers
+from src.api.guards import RateLimiter, redact_headers
 from src.api.usage_headers import USAGE_HEADERS, apply_usage
+from src.auth.tokens import TokenStore
 from src.config.personality import resolve_personality
 from src.config.settings import load_settings
 from src.state.kv_store import KVStore
@@ -58,6 +60,7 @@ def create_app(llm=None) -> FastAPI:
     )
     register_error_handlers(app)
     limiter = RateLimiter(settings.rate_limit_per_minute)
+    token_store = TokenStore(settings.tokens_db_path)
 
     @app.get("/health")
     async def health():
@@ -71,10 +74,12 @@ def create_app(llm=None) -> FastAPI:
         if len(body) > settings.max_request_body_size:
             raise HTTPException(status_code=413)
 
-        if not check_access_key(
-            request.headers.get("x-dopamine-key"), settings.dopamine_access_key
-        ):
+        principal = authenticate(
+            request.headers.get("authorization"), token_store, settings.auth_enabled
+        )
+        if principal is None:
             raise UnauthorizedError()
+        request.state.principal = principal
         if not limiter.check(request.client.host if request.client else "unknown"):
             raise RateLimitedError()
 

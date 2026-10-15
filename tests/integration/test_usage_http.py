@@ -3,7 +3,13 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 from structlog.testing import capture_logs
 
-from tests.conftest import RaisingFakeLLM, SlowFakeLLM, ai_tool_call, make_queued_llm
+from tests.conftest import (
+    RaisingFakeLLM,
+    SlowFakeLLM,
+    ai_tool_call,
+    enable_auth,
+    make_queued_llm,
+)
 
 USAGE = ("x-dopamine-tokens-in", "x-dopamine-tokens-out", "x-dopamine-steps")
 ALL_USAGE = (*USAGE, "x-dopamine-cost-usd")
@@ -18,7 +24,6 @@ def make_app(monkeypatch, tmp_path):
     monkeypatch.setenv("PERSONALITY_PATH", str(persona))
     for name in (
         "STATE_FILE",
-        "DOPAMINE_ACCESS_KEY",
         "RATE_LIMIT_PER_MINUTE",
         "LLM_PRICE_INPUT_PER_MTOK",
         "LLM_PRICE_OUTPUT_PER_MTOK",
@@ -139,8 +144,9 @@ def test_timeout_504_has_headers_and_log(make_app):
     assert len(requests) == 1 and requests[0]["status"] == 504
 
 
-def test_guard_rejections_and_health_have_no_usage_headers(make_app):
-    with _client(make_app(_two_steps(), DOPAMINE_ACCESS_KEY="s3cret")) as c:
+def test_guard_rejections_and_health_have_no_usage_headers(monkeypatch, make_app):
+    enable_auth(monkeypatch)
+    with _client(make_app(_two_steps())) as c:
         r = c.get("/a")
         health = c.get("/health")
     assert r.status_code == 401

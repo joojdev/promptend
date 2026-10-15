@@ -42,7 +42,6 @@ def _settings(**kwargs):
 def test_hardening_setting_defaults(monkeypatch):
     for name in (
         "RATE_LIMIT_PER_MINUTE",
-        "DOPAMINE_ACCESS_KEY",
         "AGENT_TIMEOUT_SECONDS",
         "SENSITIVE_HEADER_NAMES",
         "SENSITIVE_HEADER_FRAGMENTS",
@@ -50,7 +49,6 @@ def test_hardening_setting_defaults(monkeypatch):
         monkeypatch.delenv(name, raising=False)
     s = _settings()
     assert s.rate_limit_per_minute == 20
-    assert s.dopamine_access_key == ""
     assert s.agent_timeout_seconds == 30
     names, fragments = s.sensitive_header_rule
     assert names == frozenset(
@@ -61,11 +59,9 @@ def test_hardening_setting_defaults(monkeypatch):
 
 def test_hardening_settings_env_override(monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "5")
-    monkeypatch.setenv("DOPAMINE_ACCESS_KEY", "  s3cret  ")
     monkeypatch.setenv("AGENT_TIMEOUT_SECONDS", "1.5")
     s = _settings()
     assert s.rate_limit_per_minute == 5
-    assert s.dopamine_access_key == "s3cret"
     assert s.agent_timeout_seconds == 1.5
 
 
