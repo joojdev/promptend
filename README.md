@@ -132,6 +132,7 @@ The personality decides what kind of backend you are pretending to have. Set
 - `default`: a helpful, neutral API. The control group.
 - `shop`: Acme Absurdities, selling bottled Tuesday air and left-handed spoons. Has stock, prices and opinions.
 - `sarcastic`: always correct, never happy about it.
+- `sarcastico`: the same tired API, complaining in Brazilian Portuguese.
 - `website`: picks a theme from the first path it sees and serves full HTML pages for it.
 - `teapot`: answers 418 to everything and can explain why at length.
 

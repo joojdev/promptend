@@ -137,7 +137,7 @@ def test_no_presets_exits(tmp_path, capsys, monkeypatch, make):
 
 # US4
 
-SHIPPED = ["default", "sarcastic", "shop", "teapot", "website"]
+SHIPPED = ["default", "sarcastic", "sarcastico", "shop", "teapot", "website"]
 FORBIDDEN = [
     "without calling",
     "plain text reply",
