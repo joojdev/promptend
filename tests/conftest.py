@@ -98,7 +98,15 @@ def make_queued_llm(*messages: AIMessage) -> CountingFakeLLM:
 
 @pytest.fixture(autouse=True)
 def _auth_defaults(monkeypatch, tmp_path):
-    """Per-test token store and auth disabled, so tests that do not care about auth pass."""
+    """Per-test token store and auth disabled, so tests that do not care about auth pass.
+
+    Also stops Settings from reading the developer's local .env, which would leak into tests.
+    """
+    from src.cli.tokens import TokenSettings
+    from src.config.settings import Settings
+
+    for cls in (Settings, TokenSettings):
+        monkeypatch.setitem(cls.model_config, "env_file", None)
     monkeypatch.setenv("TOKENS_DB_PATH", str(tmp_path / "tokens.db"))
     monkeypatch.setenv("AUTH_ENABLED", "false")
     monkeypatch.delenv("ADMIN_USERNAME", raising=False)
